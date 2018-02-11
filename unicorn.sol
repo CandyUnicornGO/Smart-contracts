@@ -129,7 +129,7 @@ contract UnicornOwnership is UnicornBase, ERC721 {
 
 
     function totalSupply() public constant returns (uint) {
-        return unicorns.length - 1;
+        return unicorns.length;
     }
 
 
