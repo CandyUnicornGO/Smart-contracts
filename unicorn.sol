@@ -163,9 +163,12 @@ contract UnicornBreeding is UnicornOwnership {
 }
 
 contract Crowdsale {
-    UnicornBreeding public token;
 
+    UnicornBreeding public token;
+    
     uint price = 100000000000000000;
+    
+    mapping (uint256 => uint256) public prices; // if prices[id] = 0 then not for sale
 
     event TokenPurchase( address indexed beneficiary, uint256 unicornId);
     event TokenSale( address indexed beneficiary, uint256 unicornId);
@@ -173,7 +176,11 @@ contract Crowdsale {
     function Crowdsale(address _token) public {
         token = UnicornBreeding(_token);
     }
-
+    
+    function saleUnicorn(uint unicornId, uint price) public {
+        prices[unicornId] = price;
+    } 
+    
     // fallback function can be used to buy tokens
     function () external payable {
         buyTokens(msg.sender);
@@ -191,11 +198,14 @@ contract Crowdsale {
     }
 
     function buyUnicorn(uint unicornId) public payable {
-        require(msg.value == price);
+        require(msg.value >= prices[unicornId]);
+        uint dif = msg.value - prices[unicornId];
         address own = token.ownerOf(unicornId);
         require(token.allowance(this,unicornId));
         token.transferFrom(own, msg.sender,unicornId);
-        own.transfer(msg.value);
+        own.transfer(prices[unicornId]);
+        msg.sender.transfer(dif);  // give change
+        prices[unicornId] = 0; // unicorn sold
         TokenSale(msg.sender, unicornId);
     }
     
