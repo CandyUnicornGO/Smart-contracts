@@ -30,48 +30,73 @@ contract UnicornBase {
     event Transfer(address from, address to, uint256 tokenId);
 
     struct Unicorn {
-        uint256 genes;
+        uint256 gen;
         uint64 birthTime;
+
+        uint64 freezingEndTime;
+        uint16 freezingIndex;
     }
 
-    Unicorn[] unicorns;
+    uint32[14] public freezing = [
+    uint32(1 minutes),
+    uint32(2 minutes),
+    uint32(5 minutes),
+    uint32(10 minutes),
+    uint32(30 minutes),
+    uint32(1 hours),
+    uint32(2 hours),
+    uint32(4 hours),
+    uint32(8 hours),
+    uint32(16 hours),
+    uint32(1 days),
+    uint32(2 days),
+    uint32(4 days),
+    uint32(7 days)
+    ];
+    //0xA76A95918C39eE40d4a43CFAF19C35050E32E271
+    //0xC4B86bb4A4467e9F7Ed336A75308F766A37a9B2e
+
+    Unicorn[] public unicorns;
 
     mapping (uint256 => address) public unicornIndexToOwner;
     mapping (address => uint256) ownershipTokenCount;
     mapping (uint256 => address) public unicornIndexToApproved;
-    mapping(address => mapping(uint256 => uint256)) private ownerTokens;
+    //mapping(address => mapping(uint256 => uint256)) private ownerTokens;
 
 
 
-    function _transfer(address _from, address _to, uint256 _tokenId) internal {
+    function _transfer(address _from, address _to, uint256 _unicornId) internal {
         ownershipTokenCount[_to]++;
-        unicornIndexToOwner[_tokenId] = _to;
+        unicornIndexToOwner[_unicornId] = _to;
         // When creating new kittens _from is 0x0, but we can't account that address.
         if (_from != address(0)) {
             ownershipTokenCount[_from]--;
-            delete unicornIndexToApproved[_tokenId];
+            delete unicornIndexToApproved[_unicornId];
         }
 
-        Transfer(_from, _to, _tokenId);
+        Transfer(_from, _to, _unicornId);
     }
 
-    function _createUnicorn(uint256 _genes, address _owner) internal returns (uint)
+    function _createUnicorn(uint256 _gen, address _owner) internal returns (uint)
     {
         Unicorn memory _unicorn = Unicorn({
-            genes: _genes,
-            birthTime: uint64(now)
-            });
+            gen: _gen,
+            birthTime: uint64(now),
+            freezingEndTime: 0,
+            freezingIndex: 1//GET FROM GEN
+        });
 
         uint256 newUnicornId = unicorns.push(_unicorn) - 1;
 
         require(newUnicornId == uint256(uint32(newUnicornId)));
 
-        Birth(_owner,newUnicornId,_genes);
+        Birth(_owner,newUnicornId,_gen);
 
         _transfer(0, _owner, newUnicornId);
 
         return newUnicornId;
     }
+
 }
 
 
@@ -80,51 +105,51 @@ contract UnicornOwnership is UnicornBase, ERC721 {
     string public constant name = "UnicornGO";
     string public constant symbol = "UNG";
 
-    function owns(address _claimant, uint256 _tokenId) public view returns (bool) {
-        return unicornIndexToOwner[_tokenId] == _claimant;
+    function owns(address _claimant, uint256 _unicornId) public view returns (bool) {
+        return unicornIndexToOwner[_unicornId] == _claimant;
     }
 
-    function _approvedFor(address _claimant, uint256 _tokenId) internal view returns (bool) {
-        return unicornIndexToApproved[_tokenId] == _claimant;
+    function _approvedFor(address _claimant, uint256 _unicornId) internal view returns (bool) {
+        return unicornIndexToApproved[_unicornId] == _claimant;
     }
 
-    function _approve(uint256 _tokenId, address _approved) internal {
-        unicornIndexToApproved[_tokenId] = _approved;
+    function _approve(uint256 _unicornId, address _approved) internal {
+        unicornIndexToApproved[_unicornId] = _approved;
     }
 
-    function allowance(address _claimant, uint256 _tokenId) public view returns (bool) {
-        return _approvedFor(_claimant,_tokenId);
+    function allowance(address _claimant, uint256 _unicornId) public view returns (bool) {
+        return _approvedFor(_claimant,_unicornId);
     }
 
     function balanceOf(address _owner) public view returns (uint256 count) {
         return ownershipTokenCount[_owner];
     }
 
-    function transfer(address _to, uint256 _tokenId) public
+    function transfer(address _to, uint256 _unicornId) public
     {
         require(_to != address(0));
-        require(owns(msg.sender, _tokenId));
-        _transfer(msg.sender, _to, _tokenId);
+        require(owns(msg.sender, _unicornId));
+        _transfer(msg.sender, _to, _unicornId);
     }
 
 
-    function approve(address _to, uint256 _tokenId) public
+    function approve(address _to, uint256 _unicornId) public
     {
-        require(owns(msg.sender, _tokenId));
-        _approve(_tokenId, _to);
-        Approval(msg.sender, _to, _tokenId);
+        require(owns(msg.sender, _unicornId));
+        _approve(_unicornId, _to);
+        Approval(msg.sender, _to, _unicornId);
     }
 
 
-    function transferFrom(address _from, address _to, uint256 _tokenId) public
+    function transferFrom(address _from, address _to, uint256 _unicornId) public
     {
         require(_to != address(0));
         require(_to != address(this));
 
-        require(_approvedFor(msg.sender, _tokenId));
-        require(owns(_from, _tokenId));
+        require(_approvedFor(msg.sender, _unicornId));
+        require(owns(_from, _unicornId));
 
-        _transfer(_from, _to, _tokenId);
+        _transfer(_from, _to, _unicornId);
     }
 
 
@@ -133,9 +158,9 @@ contract UnicornOwnership is UnicornBase, ERC721 {
     }
 
 
-    function ownerOf(uint256 _tokenId) public constant returns (address owner)
+    function ownerOf(uint256 _unicornId) public constant returns (address owner)
     {
-        owner = unicornIndexToOwner[_tokenId];
+        owner = unicornIndexToOwner[_unicornId];
         require(owner != address(0));
     }
 
@@ -150,63 +175,67 @@ contract UnicornOwnership is UnicornBase, ERC721 {
 
 
 contract UnicornBreeding is UnicornOwnership {
-    event HybridizationAdded(uint indexed lastHybridizationId, uint indexed token_id, uint price);
-    event HybridizationAccepted(uint indexed HybridizationId, uint indexed token_id);
+    event HybridizationAdded(uint indexed lastHybridizationId, uint indexed unicorn_id, uint price);
+    event HybridizationAccepted(uint indexed HybridizationId, uint indexed unicorn_id);
 
     uint public lastHybridizationId;
 
     struct Hybridization{
-        uint token_id;
+        uint unicorn_id;
         uint price;
-        uint second_token_id;
+        uint second_unicorn_id;
         bool accepted;
         bytes32 hash;
     }
 
-    mapping (uint => Hybridization) hybridizations;
+    mapping (uint => Hybridization) public hybridizations;
 
 
-    function makeHybridization(uint _token_id, uint _price)  public returns (uint tHybridizationId)
+    function makeHybridization(uint _unicornId, uint _price)  public returns (uint HybridizationId)
     {
-        require(owns(msg.sender, _token_id));
+        require(owns(msg.sender, _unicornId));
         //предусмотреть смену владельца первого токена.
 
-        lastHybridizationId = lastHybridizationId++;
+        lastHybridizationId += 1;
         Hybridization storage h = hybridizations[lastHybridizationId];
 
-        h.token_id = _token_id;
+        h.unicorn_id = _unicornId;
         h.price = _price;
 
-        h.second_token_id = 0;
+        h.second_unicorn_id = 0;
         h.accepted = false;
 
-        h.hash = keccak256(lastHybridizationId,h.token_id,h.price);
+        h.hash = keccak256(lastHybridizationId,h.unicorn_id,h.price);
 
-        HybridizationAdded(lastHybridizationId, h.token_id,h.price);
+        HybridizationAdded(lastHybridizationId, h.unicorn_id,h.price);
 
         return lastHybridizationId;
     }
 
-    function acceptHybridization (uint hybridizationId, uint _token_id) public payable
+    function acceptHybridization (uint hybridizationId, uint _unicorn_id) public payable
     {
         Hybridization storage h = hybridizations[hybridizationId];
         require (!h.accepted);
-        require (keccak256(hybridizationId,h.token_id,h.price)==h.hash);
-        require(owns(msg.sender, _token_id));
+        require (keccak256(hybridizationId,h.unicorn_id,h.price)==h.hash);
+        require(owns(msg.sender, _unicorn_id));
         require(msg.value == h.price);
+        require(isReadyForHybridization(_unicorn_id));
+
         //предусмотреть смену владельца первого токена.
         //h.token_id owner может быть овнером h.second_token_id ????
 
-        h.second_token_id = _token_id;
+        h.second_unicorn_id = _unicorn_id;
 
-        uint newGen = blackBox(unicorns[h.token_id].gen,unicorns[h.second_token_id].gen);
+        uint newGen = blackBox(unicorns[h.unicorn_id].gen,unicorns[h.second_unicorn_id].gen);
         createUnicorn(newGen,msg.sender);
 
-        address own = ownerOf(h.token_id);
+        address own = ownerOf(h.unicorn_id);
         own.transfer(msg.value);
 
+        _setFreezing(unicorns[_unicorn_id]);
+
         h.accepted = true;
-        HybridizationAccepted(hybridizationId, _token_id);
+        HybridizationAccepted(hybridizationId, _unicorn_id);
     }
 
 
@@ -231,6 +260,16 @@ contract UnicornBreeding is UnicornOwnership {
 
     function createGen()  internal pure returns(uint256) {
         return 1;
+    }
+
+
+    function isReadyForHybridization(uint _unicornId) public view returns (bool) {
+        return (unicorns[_unicornId].freezingEndTime <= uint64(now));
+    }
+
+
+    function _setFreezing(Unicorn storage _unicorn) internal {
+        _unicorn.freezingEndTime = uint64((freezing[_unicorn.freezingIndex]) + uint64(now));
     }
 }
 
