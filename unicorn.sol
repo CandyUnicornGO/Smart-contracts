@@ -1,39 +1,125 @@
 pragma solidity ^0.4.18;
 
+library SafeMath {
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0) {
+            return 0;
+        }
+        uint256 c = a * b;
+        assert(c / a == b);
+        return c;
+    }
+
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        // assert(b > 0); // Solidity automatically throws when dividing by 0
+        uint256 c = a / b;
+        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+        return c;
+    }
+
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        assert(b <= a);
+        return a - b;
+    }
+
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        assert(c >= a);
+        return c;
+    }
+}
+
+contract Ownable {
+    address public owner;
+
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+
+    /**
+     * @dev The Ownable constructor sets the original `owner` of the contract to the sender
+     * account.
+     */
+    function Ownable() public {
+        owner = msg.sender;
+    }
+
+
+    /**
+     * @dev Throws if called by any account other than the owner.
+     */
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
+    }
+
+
+    /**
+     * @dev Allows the current owner to transfer control of the contract to a newOwner.
+     * @param newOwner The address to transfer ownership to.
+     */
+    function transferOwnership(address newOwner) public onlyOwner {
+        require(newOwner != address(0));
+        OwnershipTransferred(owner, newOwner);
+        owner = newOwner;
+    }
+
+}
+
+
+contract BlackBoxController{
+    function blackBox(uint gen1, uint gen2) public pure returns (uint gen) {
+        return gen1 + gen2;
+    }
+
+    function isBlackBox() public pure returns (bool) {
+        return true;
+    }
+}
+
+
+contract BlackBoxInterface {
+    function isBlackBox() public pure returns (bool);
+    function blackBox(uint gen1, uint gen2) public pure returns (uint gen);
+}
+
+
+contract CandyCoinInterface {
+    uint256 public totalSupply;
+    function balanceOf(address who) public view returns (uint256);
+    function transfer(address to, uint256 value) public returns (bool);
+    function allowance(address owner, address spender) public view returns (uint256);
+    function transferFrom(address from, address to, uint256 value) public returns (bool);
+    function approve(address spender, uint256 value) public returns (bool);
+}
+
 
 contract ERC721 {
-    // ERC20 compatible functions
-    //function name() constant returns (string name);
-    //function symbol() constant returns (string symbol);
     function totalSupply() public constant returns (uint);
     function balanceOf(address _owner) public constant returns (uint balance);
-    // Functions that define ownership
+
     function ownerOf(uint256 _tokenId) public constant returns (address owner);
+    function owns(address _claimant, uint256 _tokenId) public view returns (bool);
     function approve(address _to, uint256 _tokenId) public;
     function allowance(address _claimant, uint256 _tokenId) public view returns (bool);
-    //TODO function takeOwnership(uint256 _tokenId);
+
     function transfer(address _to, uint256 _tokenId) public;
     function transferFrom(address _from, address _to, uint256 _tokenId) public;
-    //function tokenOfOwnerByIndex(address _owner, uint256 _index) public constant returns (uint tokenId);
-    // Token metadata
-    //function tokenMetadata(uint256 _tokenId) constant returns (string infoUrl);
-    // Events
-    //event Transfer(address indexed _from, address indexed _to, uint256 _tokenId);
+
+    event Transfer(address indexed _from, address indexed _to, uint256 _tokenId);
     event Approval(address indexed _owner, address indexed _approved, uint256 _tokenId);
 }
 
 
-contract UnicornBase {
+contract UnicornBase is ERC721{
 
     event Birth(address owner, uint256 unicornId, uint256 genes);
-
-    event Transfer(address from, address to, uint256 tokenId);
 
     struct Unicorn {
         uint256 gen;
         uint64 birthTime;
 
-        uint64 freezingEndTime;
+        uint freezingEndTime;
         uint16 freezingIndex;
     }
 
@@ -68,7 +154,7 @@ contract UnicornBase {
     function _transfer(address _from, address _to, uint256 _unicornId) internal {
         ownershipTokenCount[_to]++;
         unicornIndexToOwner[_unicornId] = _to;
-        // When creating new kittens _from is 0x0, but we can't account that address.
+        // When creating new  _from is 0x0, but we can't account that address.
         if (_from != address(0)) {
             ownershipTokenCount[_from]--;
             delete unicornIndexToApproved[_unicornId];
@@ -83,8 +169,8 @@ contract UnicornBase {
             gen: _gen,
             birthTime: uint64(now),
             freezingEndTime: 0,
-            freezingIndex: 1//GET FROM GEN
-        });
+            freezingIndex: 4//GET FROM GEN
+            });
 
         uint256 newUnicornId = unicorns.push(_unicorn) - 1;
 
@@ -97,17 +183,6 @@ contract UnicornBase {
         return newUnicornId;
     }
 
-}
-
-
-contract UnicornOwnership is UnicornBase, ERC721 {
-
-    string public constant name = "UnicornGO";
-    string public constant symbol = "UNG";
-
-    function owns(address _claimant, uint256 _unicornId) public view returns (bool) {
-        return unicornIndexToOwner[_unicornId] == _claimant;
-    }
 
     function _approvedFor(address _claimant, uint256 _unicornId) internal view returns (bool) {
         return unicornIndexToApproved[_unicornId] == _claimant;
@@ -115,6 +190,10 @@ contract UnicornOwnership is UnicornBase, ERC721 {
 
     function _approve(uint256 _unicornId, address _approved) internal {
         unicornIndexToApproved[_unicornId] = _approved;
+    }
+
+    function owns(address _claimant, uint256 _unicornId) public view returns (bool) {
+        return unicornIndexToOwner[_unicornId] == _claimant;
     }
 
     function allowance(address _claimant, uint256 _unicornId) public view returns (bool) {
@@ -169,14 +248,26 @@ contract UnicornOwnership is UnicornBase, ERC721 {
     // return ownerTokens[_owner][_index];
     //}
 
+}
 
+
+contract Unicorn is UnicornBase {
+
+    string public constant name = "UnicornGO";
+    string public constant symbol = "UNG";
 
 }
 
 
-contract UnicornBreeding is UnicornOwnership {
+
+contract UnicornBreeding is Unicorn, Ownable {
+    using SafeMath for uint;
+
     event HybridizationAdded(uint indexed lastHybridizationId, uint indexed unicorn_id, uint price);
     event HybridizationAccepted(uint indexed HybridizationId, uint indexed unicorn_id);
+
+    BlackBoxInterface public BlackBoxContract;
+    CandyCoinInterface token;
 
     uint public lastHybridizationId;
 
@@ -189,6 +280,18 @@ contract UnicornBreeding is UnicornOwnership {
     }
 
     mapping (uint => Hybridization) public hybridizations;
+
+
+    function UnicornBreeding(address _token) public{
+        token = CandyCoinInterface(_token);
+        lastHybridizationId = 0;
+    }
+
+    function setBlackBoxAddress(address _address) external onlyOwner {
+        BlackBoxInterface candidateContract = BlackBoxInterface(_address);
+        require(candidateContract.isBlackBox());
+        BlackBoxContract = candidateContract;
+    }
 
 
     function makeHybridization(uint _unicornId, uint _price)  public returns (uint HybridizationId)
@@ -239,9 +342,9 @@ contract UnicornBreeding is UnicornOwnership {
     }
 
 
-    function blackBox(uint gen1, uint gen2) internal pure returns(uint256 newGen)
+    function blackBox(uint gen1, uint gen2) internal view returns(uint256 newGen)
     {
-        return gen1 + gen2;
+        return BlackBoxContract.blackBox(gen1,gen2);
     }
 
     function createUnicorn(uint _gen, address _owner) public returns(uint256)
@@ -271,7 +374,29 @@ contract UnicornBreeding is UnicornOwnership {
     function _setFreezing(Unicorn storage _unicorn) internal {
         _unicorn.freezingEndTime = uint64((freezing[_unicorn.freezingIndex]) + uint64(now));
     }
+
+a
+    //change freezing time for candy
+    function subFreezingTime(uint _unicornId, uint _value) public{
+        require(token.allowance(msg.sender, this) >= _value);
+        require(token.transferFrom(msg.sender, this, _value));
+
+        uint subTime = _value.mul(5 minutes);
+
+        Unicorn storage unicorn = unicorns[_unicornId];
+
+        unicorn.freezingEndTime = unicorn.freezingEndTime.sub(subTime);
+    }
+
+
+    function withdrawTokens(address _to, uint _value) onlyOwner public {
+        token.transfer(_to,_value);
+    }
+
 }
+
+
+
 
 contract Crowdsale {
 
