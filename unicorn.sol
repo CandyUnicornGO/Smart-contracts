@@ -31,8 +31,12 @@ library SafeMath {
 
 
 contract BlackBoxController{
-    function blackBox(uint gen1, uint gen2) public pure returns (uint gen) {
-        return gen1 + gen2;
+    function blackBox(bytes gen1, bytes gen2) public pure returns (bytes gen) {
+        return bytes(1);
+    }
+
+    function blackBoxMix() public pure returns (bytes gen) {
+        return bytes(1);
     }
 
     function isBlackBox() public pure returns (bool) {
@@ -43,7 +47,8 @@ contract BlackBoxController{
 
 contract BlackBoxInterface {
     function isBlackBox() public pure returns (bool);
-    function blackBox(uint gen1, uint gen2) public pure returns (uint gen);
+    function blackBox() public pure returns (bytes gen);
+    function blackBoxMix(bytes gen1, bytes gen2) public pure returns (bytes gen);
 }
 
 
@@ -173,13 +178,14 @@ contract UnicornBase is ERC721{
     event Birth(address owner, uint256 unicornId, uint256 genes);
 
     struct Unicorn {
-        uint256 gen;
+        bytes gen;
         uint64 birthTime;
 
-        uint freezingEndTime;
+        uint freezingEndTime; //TODO
         uint16 freezingIndex;
     }
 
+    //TODO
     uint32[14] public freezing = [
     uint32(1 minutes),
     uint32(2 minutes),
@@ -196,15 +202,12 @@ contract UnicornBase is ERC721{
     uint32(4 days),
     uint32(7 days)
     ];
-    //0xA76A95918C39eE40d4a43CFAF19C35050E32E271
-    //0xC4B86bb4A4467e9F7Ed336A75308F766A37a9B2e
 
     Unicorn[] public unicorns;
 
     mapping (uint256 => address) public unicornIndexToOwner;
     mapping (address => uint256) ownershipTokenCount;
     mapping (uint256 => address) public unicornIndexToApproved;
-    //mapping(address => mapping(uint256 => uint256)) private ownerTokens;
 
 
 
@@ -220,18 +223,19 @@ contract UnicornBase is ERC721{
         Transfer(_from, _to, _unicornId);
     }
 
-    function _createUnicorn(uint256 _gen, address _owner) internal returns (uint)    {
+    function _createUnicorn(bytes _gen, address _owner) internal returns (uint)    {
         Unicorn memory _unicorn = Unicorn({
             gen: _gen,
             birthTime: uint64(now),
             freezingEndTime: 0,
-            freezingIndex: 4//GET FROM GEN
-            });
+            freezingIndex: 4//TODO GET FROM GEN
+        });
 
         uint256 newUnicornId = unicorns.push(_unicorn) - 1;
 
         require(newUnicornId == uint256(uint32(newUnicornId)));
 
+        //TODO choose name for event =)
         Birth(_owner,newUnicornId,_gen);
 
         _transfer(0, _owner, newUnicornId);
@@ -306,7 +310,6 @@ contract UnicornBase is ERC721{
 contract Unicorn is UnicornBase {
     string public constant name = "UnicornGO";
     string public constant symbol = "UNG";
-
 }
 
 
@@ -315,17 +318,20 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     using SafeMath for uint;
 
 
-    event HybridizationAdded(uint indexed lastHybridizationId, uint indexed unicorn_id, uint price);
-    event HybridizationAccepted(uint indexed HybridizationId, uint indexed unicorn_id);
+    event HybridizationAdded(uint indexed lastHybridizationId, uint indexed UnicornId, uint price);
+    event HybridizationAccepted(uint indexed HybridizationId, uint indexed UnicornId, uint  NewUnicornId);
+    event HybridizationCancelled(uint indexed HybridizationId);
     event FoundsTransferd(address dividendManager, uint value);
+    event BlackBox(address indexed owner, uint indexed UnicornId);
 
     BlackBoxInterface public BlackBoxContract; //onlyOwner
     CandyCoinInterface token; //SET on deploy
 
-    uint public subFreezingPrice; //onlyCommunity
+    uint public subFreezingPrice; //onlyCommunity price in CandyCoins
     uint public subFreezingTime; //onlyCommunity
     uint public dividendPercent; //OnlyManager 4 digits. 10.5% = 1050
-    address public dividendManagerAddress; //SET on deploy
+    uint public blackBoxPrice; //OnlyManager price in weis
+    address public dividendManagerAddress; //onlyCommunity
 
     uint public lastHybridizationId;
 
@@ -347,20 +353,26 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         subFreezingPrice = 1;
         subFreezingTime = 1 minutes;
         dividendPercent = 375; //3.75%
+        blackBoxPrice = 10000000000000000;
     }
 
 
     function setBlackBoxAddress(address _address) external onlyOwner    {
+        require(_address != address(0));
         BlackBoxInterface candidateContract = BlackBoxInterface(_address);
         require(candidateContract.isBlackBox());
         BlackBoxContract = candidateContract;
+    }
+
+    function setDividendManagerAddress(address _dividendManagerAddress) external onlyCommunity    {
+        require(_dividendManagerAddress != address(0));
+        dividendManagerAddress = _dividendManagerAddress;
     }
 
 
     function makeHybridization(uint _unicornId, uint _price)  public returns (uint HybridizationId)    {
         require(owns(msg.sender, _unicornId));
         require(isReadyForHybridization(_unicornId));
-        //предусмотреть смену владельца первого токена.
 
         lastHybridizationId += 1;
         Hybridization storage h = hybridizations[lastHybridizationId];
@@ -384,19 +396,17 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         require (!h.accepted);
         require (keccak256(hybridizationId,h.unicorn_id,h.price)==h.hash);
         require(owns(msg.sender, _unicorn_id));
+        require(_unicorn_id != h.unicorn_id);
 
         //uint price = h.price.add(valueFromPercent(h.price,dividendPercent));
 
         require(msg.value == h.price.add(valueFromPercent(h.price,dividendPercent)));
         require(isReadyForHybridization(_unicorn_id));
 
-        //предусмотреть смену владельца первого токена.
-        //h.token_id owner может быть овнером h.second_token_id ????
-
         h.second_unicorn_id = _unicorn_id;
 
-        uint newGen = blackBox(unicorns[h.unicorn_id].gen,unicorns[h.second_unicorn_id].gen);
-        createUnicorn(newGen,msg.sender);
+        bytes newGen = blackBoxMix(unicorns[h.unicorn_id].gen,unicorns[h.second_unicorn_id].gen);
+        uint256 new_unicornId = _createUnicorn(newGen, msg.sender);
 
         address own = ownerOf(h.unicorn_id);
         own.transfer(h.price);
@@ -404,30 +414,33 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         _setFreezing(unicorns[_unicorn_id]);
 
         h.accepted = true;
-        HybridizationAccepted(hybridizationId, _unicorn_id);
+        HybridizationAccepted(hybridizationId, _unicorn_id, new_unicornId);
     }
 
 
-    function blackBox(uint gen1, uint gen2) internal view returns(uint256 newGen)    {
-        return BlackBoxContract.blackBox(gen1,gen2);
+    function cancelHybridization (uint hybridizationId) public     {
+        Hybridization storage h = hybridizations[hybridizationId];
+        require (!h.accepted);
+        require (keccak256(hybridizationId,h.unicorn_id,h.price)==h.hash);
+        require(owns(msg.sender, h.unicorn_id));
+
+        h.accepted = true;
+
+        HybridizationCancelled(hybridizationId);
     }
 
 
-    function createUnicorn(uint _gen, address _owner) public returns(uint256)    {
-        uint256 unicornId = _createUnicorn(_gen, _owner);
+    //Hybridization
+    function blackBoxMix(bytes gen1, bytes gen2) internal view returns(bytes newGen)    {
+        return BlackBoxContract.blackBoxMix(gen1,gen2);
+    }
+
+    //Create new 0 gen
+    function blackBox() public payable returns(uint256)   {
+        bytes gen = BlackBoxContract.blackBox();
+        uint256 unicornId = _createUnicorn(gen, msg.sender);
+        BlackBox(msg.sender,unicornId);
         return unicornId;
-    }
-
-
-    function newBirth(address _owner) public returns(uint256)    {
-        uint256 gen = createGen();
-        uint256 unicornId = _createUnicorn(gen, _owner);
-        return unicornId;
-    }
-
-
-    function createGen()  internal pure returns(uint256)    {
-        return 1;
     }
 
 
@@ -436,6 +449,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     }
 
 
+    //TODO
     function _setFreezing(Unicorn storage _unicorn) internal    {
         _unicorn.freezingEndTime = uint64((freezing[_unicorn.freezingIndex]) + uint64(now));
     }
@@ -446,27 +460,35 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         require(token.allowance(msg.sender, this) >= subFreezingPrice);
         require(token.transferFrom(msg.sender, this, subFreezingPrice));
 
-        //uint subTime = _value.mul(5 minutes);
-
         Unicorn storage unicorn = unicorns[_unicornId];
 
         unicorn.freezingEndTime = unicorn.freezingEndTime.sub(subFreezingTime);
     }
 
 
+    //TODO decide roles and requires
+    //price in CandyCoins
     function setSubFreezingPrice(uint _newPrice) public onlyCommunity    {
         subFreezingPrice = _newPrice;
     }
 
-
+    //TODO decide roles and requires
+    //time in minutes
     function setSubFreezingTime(uint _newTime) public onlyCommunity    {
         subFreezingTime = _newTime * 1 minutes;
     }
 
-
+    //TODO decide roles and requires
+    //1% = 100
     function setDividendPercent(uint _newPercent) public onlyManager    {
-        require(_newPercent < 2500);
+        require(_newPercent < 2500); //no more then 25%
         dividendPercent = _newPercent;
+    }
+
+    //TODO decide roles and requires
+    //price in weis
+    function setBlackBoxPrice(uint _newPrice) public onlyManager    {
+        blackBoxPrice = _newPrice;
     }
 
 
@@ -477,7 +499,8 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     }
 
 
-    function withdrawTokens(address _to, uint _value) onlyOwner public    {
+    //TODO
+    function withdrawTokens(address _to, uint _value) onlyManager public    {
         token.transfer(_to,_value);
     }
 
@@ -509,14 +532,11 @@ contract UnicornToken {
     address[] allTokenHolders;
     mapping(address => uint) public holdersIndexes; //index start from 1
 
-    /* The name of the contract */
-    string public name;
+    string public constant name = "Unicorn Dividend Token";
+    string public constant symbol = "UDT";
+    uint8 public constant decimals = 18;
 
-    /* The symbol for the contract */
-    string public symbol;
-
-    /* How many DPs are in use in this contract */
-    uint8 public decimals;
+    uint256 public constant INITIAL_SUPPLY = 100  * (10 ** uint256(decimals));
 
     /* Defines the current supply of the token in its own units */
     uint256 totalSupplyAmount = 0;
@@ -543,12 +563,10 @@ contract UnicornToken {
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 
     /* Create a new instance of this fund with links to other contracts that are required. */
-    function UnicornToken(/*address _icoContractAddress, address _authenticationManagerAddress*/) public {
-        // Setup defaults
-        name = "Unicorn Dividend Token";
-        symbol = "UDT";
-        decimals = 8;
-
+    function UnicornToken() public {
+        totalSupplyAmount = INITIAL_SUPPLY;
+        balances[msg.sender] = INITIAL_SUPPLY;
+        tokenOwnerAdd(msg.sender);
     }
 
     modifier onlyPayloadSize(uint numwords) {
@@ -656,14 +674,6 @@ contract UnicornToken {
         }
     }
 
-    /*function mintTokens(address _address, uint256 _amount) public onlyPayloadSize(2) {
-        bool isNew = balances[_address] == 0;
-        totalSupplyAmount = totalSupplyAmount.add(_amount);
-        balances[_address] = balances[_address].add(_amount);
-        if (isNew)
-            tokenOwnerAdd(_address);
-        Transfer(0, _address, _amount);
-    }*/
 }
 
 
@@ -688,6 +698,7 @@ contract DividendManager {
         unicornContract = UnicornToken(_unicornContract);
     }
 
+    //TODO
     /* Makes a dividend payment - we make it available to all senders then send the change back to the caller.  We don't actually send the payments to everyone to reduce gas cost and also to
        prevent potentially getting into a situation where we have recipients throwing causing dividend failures and having to consolidate their dividends in a separate process. */
     function () public payable {
@@ -735,13 +746,10 @@ contract DividendManager {
 }
 
 
-
 contract Crowdsale {
 
     UnicornBreeding public token;
-    
-    uint price = 100000000000000000;
-    
+
     mapping (uint256 => uint256) public prices; // if prices[id] = 0 then not for sale
 
     event TokenPurchase( address indexed beneficiary, uint256 unicornId);
@@ -750,11 +758,11 @@ contract Crowdsale {
     function Crowdsale(address _token) public {
         token = UnicornBreeding(_token);
     }
-    
+
     function saleUnicorn(uint unicornId, uint price) public {
         prices[unicornId] = price;
-    } 
-    
+    }
+
     // fallback function can be used to buy tokens
     function () external payable {
         buyTokens(msg.sender);
@@ -782,5 +790,7 @@ contract Crowdsale {
         prices[unicornId] = 0; // unicorn sold
         TokenSale(msg.sender, unicornId);
     }
-    
+
 }
+
+
