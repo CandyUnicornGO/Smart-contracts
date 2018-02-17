@@ -31,12 +31,14 @@ library SafeMath {
 
 
 contract BlackBoxController{
-    function blackBox(bytes gen1, bytes gen2) public pure returns (bytes gen) {
-        return bytes(1);
+    function genCore(/*bytes gen1, bytes gen2*/) public pure returns (bytes) {
+        bytes memory gen = new bytes(108);
+        return gen;
     }
 
-    function blackBoxMix() public pure returns (bytes gen) {
-        return bytes(1);
+    function createGen0() public pure returns (bytes) {
+        bytes memory gen = new bytes(108);
+        return gen;
     }
 
     function isBlackBox() public pure returns (bool) {
@@ -47,8 +49,8 @@ contract BlackBoxController{
 
 contract BlackBoxInterface {
     function isBlackBox() public pure returns (bool);
-    function blackBox() public pure returns (bytes gen);
-    function blackBoxMix(bytes gen1, bytes gen2) public pure returns (bytes gen);
+    function createGen0() public pure returns (bytes gen);
+    function genCore(bytes gen1, bytes gen2) public pure returns (bytes gen);
 }
 
 
@@ -175,7 +177,7 @@ contract UnicornAccessControl {
 
 contract UnicornBase is ERC721{
 
-    event Birth(address owner, uint256 unicornId, uint256 genes);
+    event Birth(address owner, uint256 unicornId, bytes genes);
 
     struct Unicorn {
         bytes gen;
@@ -229,7 +231,7 @@ contract UnicornBase is ERC721{
             birthTime: uint64(now),
             freezingEndTime: 0,
             freezingIndex: 4//TODO GET FROM GEN
-        });
+            });
 
         uint256 newUnicornId = unicorns.push(_unicorn) - 1;
 
@@ -322,7 +324,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     event HybridizationAccepted(uint indexed HybridizationId, uint indexed UnicornId, uint  NewUnicornId);
     event HybridizationCancelled(uint indexed HybridizationId);
     event FoundsTransferd(address dividendManager, uint value);
-    event BlackBox(address indexed owner, uint indexed UnicornId);
+    event CreateUnicorn(address indexed owner, uint indexed UnicornId);
 
     BlackBoxInterface public BlackBoxContract; //onlyOwner
     CandyCoinInterface token; //SET on deploy
@@ -330,7 +332,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     uint public subFreezingPrice; //onlyCommunity price in CandyCoins
     uint public subFreezingTime; //onlyCommunity
     uint public dividendPercent; //OnlyManager 4 digits. 10.5% = 1050
-    uint public blackBoxPrice; //OnlyManager price in weis
+    uint public createUnicornPrice; //OnlyManager price in weis
     address public dividendManagerAddress; //onlyCommunity
 
     uint public lastHybridizationId;
@@ -353,7 +355,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         subFreezingPrice = 1;
         subFreezingTime = 1 minutes;
         dividendPercent = 375; //3.75%
-        blackBoxPrice = 10000000000000000;
+        createUnicornPrice = 10000000000000000;
     }
 
 
@@ -405,7 +407,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
         h.second_unicorn_id = _unicorn_id;
 
-        bytes newGen = blackBoxMix(unicorns[h.unicorn_id].gen,unicorns[h.second_unicorn_id].gen);
+        bytes memory newGen = genCore(unicorns[h.unicorn_id].gen,unicorns[h.second_unicorn_id].gen);
         uint256 new_unicornId = _createUnicorn(newGen, msg.sender);
 
         address own = ownerOf(h.unicorn_id);
@@ -430,16 +432,24 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     }
 
 
+    //TODO RECIVE bytes from BlackBoxContract
     //Hybridization
-    function blackBoxMix(bytes gen1, bytes gen2) internal view returns(bytes newGen)    {
-        return BlackBoxContract.blackBoxMix(gen1,gen2);
+    function genCore(bytes gen1, bytes gen2) internal pure returns(bytes newGen)    {
+        //byte[108] storge gen =  BlackBoxContract.genCore(gen1,gen2);
+        //for compile;
+        gen1 = gen2;
+        bytes memory gen =gen1;
+        return gen;
     }
 
+    //TODO RECIVE bytes from BlackBoxContract
     //Create new 0 gen
-    function blackBox() public payable returns(uint256)   {
-        bytes gen = BlackBoxContract.blackBox();
+    function createUnicorn() public payable returns(uint256)   {
+        require(msg.value == createUnicornPrice);
+        //bytes memory gen = BlackBoxContract.createGen0();
+        bytes memory gen = new bytes(108);
         uint256 unicornId = _createUnicorn(gen, msg.sender);
-        BlackBox(msg.sender,unicornId);
+        CreateUnicorn(msg.sender,unicornId);
         return unicornId;
     }
 
@@ -487,8 +497,8 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
     //TODO decide roles and requires
     //price in weis
-    function setBlackBoxPrice(uint _newPrice) public onlyManager    {
-        blackBoxPrice = _newPrice;
+    function setCreateUnicornPrice(uint _newPrice) public onlyManager    {
+        createUnicornPrice = _newPrice;
     }
 
 
@@ -771,10 +781,10 @@ contract Crowdsale {
     // low level token purchase function
     function buyTokens(address beneficiary) public payable {
         require(beneficiary != address(0));
-        require(msg.value == price);
+        //require(msg.value == price);
 
-        uint unicornId = token.newBirth(beneficiary);
-        TokenPurchase(msg.sender, unicornId);
+        //uint unicornId = token.newBirth(beneficiary);
+        //TokenPurchase(msg.sender, unicornId);
 
         //forwardFunds();
     }
