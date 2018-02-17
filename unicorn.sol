@@ -30,29 +30,6 @@ library SafeMath {
 }
 
 
-contract BlackBoxController{
-    function genCore(/*bytes gen1, bytes gen2*/) public pure returns (bytes) {
-        bytes memory gen = new bytes(108);
-        return gen;
-    }
-
-    function createGen0() public pure returns (bytes) {
-        bytes memory gen = new bytes(108);
-        return gen;
-    }
-
-    function isBlackBox() public pure returns (bool) {
-        return true;
-    }
-}
-
-
-contract BlackBoxInterface {
-    function isBlackBox() public pure returns (bool);
-    function createGen0() public pure returns (bytes gen);
-    function genCore(bytes gen1, bytes gen2) public pure returns (bytes gen);
-}
-
 
 contract CandyCoinInterface {
     uint256 public totalSupply;
@@ -79,6 +56,122 @@ contract ERC721 {
     event Transfer(address indexed _from, address indexed _to, uint256 _tokenId);
     event Approval(address indexed _owner, address indexed _approved, uint256 _tokenId);
 }
+
+
+contract BlackBoxAccessControl {
+    address public owner;
+    address public breedingAddress;
+    UnicornBreeding public breedingContract;
+
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+
+    function BlackBoxAccessControl() public {
+        owner = msg.sender;
+    }
+
+
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
+    }
+
+
+    function transferOwnership(address newOwner) public onlyOwner {
+        require(newOwner != address(0));
+        OwnershipTransferred(owner, newOwner);
+        owner = newOwner;
+    }
+
+    //TODO ?? LIST OF Address
+    modifier onlyBreeding() {
+        require(msg.sender == breedingAddress);
+        _;
+    }
+
+    function setBreeding(address _breedingAddress) external onlyOwner {
+        require(_breedingAddress != address(0));
+        breedingAddress = _breedingAddress;
+        breedingContract = UnicornBreeding(breedingAddress);
+    }
+
+}
+
+
+contract BlackBoxController is BlackBoxAccessControl /*is usingOraclize*/  {
+
+    event logRes(string res);
+
+    mapping(bytes32 => uint) validIds; //oraclize query hash -> unicorn_id - 1 for require validIds[hash] > 0
+    //only for compile
+    mapping(bytes => uint) test;
+
+    function BlackBoxController() public {
+
+    }
+
+    //TODO
+    function __callback(bytes32 hash, string result) public {
+        require(validIds[hash] > 0);
+        //if (msg.sender != oraclize_cbAddress()) throw;
+        bytes memory gen = bytes(result);
+
+        breedingContract.setGen(validIds[hash] - 1,gen);
+        logRes(result);
+        delete validIds[hash];
+
+    }
+
+    /*function updatePrice() payable {
+        if (oraclize_getPrice("URL") > this.balance) {
+            LogNewOraclizeQuery("Oraclize query was NOT sent, please add some ETH to cover for the query fee");
+        } else {
+            LogNewOraclizeQuery("Oraclize query was sent, standing by for the answer..");
+            bytes32 queryId =
+            oraclize_query(60, "URL", "json(http://api.fixer.io/latest?symbols=USD,GBP).rates.GBP");
+            validIds[queryId] = true;
+        }
+    }*/
+
+    //only UnicornContract;
+    function genCore(uint unicornId,bytes gen1, bytes gen2) onlyBreeding public  returns (bytes32) {
+        //oraclize here
+        bytes32 queryId = block.blockhash(block.number);
+        validIds[queryId] = unicornId + 1; //for require validIds[hash] > 0
+
+        //FOR TEST ONLY;
+        __callback(queryId, 'A76A95918C39eE40d4a43CFAF19C35050E32E271');
+
+        test[gen1] = 1;
+        test[gen2] = 1;
+
+        return queryId;
+    }
+
+    function createGen0(uint unicornId) onlyBreeding public  returns (bytes32) {
+        //oraclize here
+        bytes32 queryId = block.blockhash(block.number);
+        validIds[queryId] = unicornId + 1;//for require validIds[hash] > 0
+
+        //FOR TEST ONLY;
+        __callback(queryId, 'A76A95918C39eE40d4a43CFAF19C35050E32E271');
+
+        return queryId;
+    }
+
+    function isBlackBox() public pure returns (bool) {
+        return true;
+    }
+}
+
+
+contract BlackBoxInterface {
+    function isBlackBox() public pure returns (bool);
+    function createGen0(uint unicornId) public  returns (bytes32);
+    function genCore(uint unicornId,bytes gen1, bytes gen2) public  returns (bytes32);
+}
+
 
 
 contract UnicornAccessControl {
@@ -177,14 +270,14 @@ contract UnicornAccessControl {
 
 contract UnicornBase is ERC721{
 
-    event Birth(address owner, uint256 unicornId, bytes genes);
+    event Birth(address owner, uint256 unicornId);
 
     struct Unicorn {
         bytes gen;
         uint64 birthTime;
 
         uint freezingEndTime; //TODO
-        uint16 freezingIndex;
+        uint16 freezingIndex; //TODO ????
     }
 
     //TODO
@@ -225,9 +318,9 @@ contract UnicornBase is ERC721{
         Transfer(_from, _to, _unicornId);
     }
 
-    function _createUnicorn(bytes _gen, address _owner) internal returns (uint)    {
+    function _createUnicorn(/*bytes _gen,*/ address _owner) internal returns (uint)    {
         Unicorn memory _unicorn = Unicorn({
-            gen: _gen,
+            gen: new bytes(1),
             birthTime: uint64(now),
             freezingEndTime: 0,
             freezingIndex: 4//TODO GET FROM GEN
@@ -238,7 +331,7 @@ contract UnicornBase is ERC721{
         require(newUnicornId == uint256(uint32(newUnicornId)));
 
         //TODO choose name for event =)
-        Birth(_owner,newUnicornId,_gen);
+        Birth(_owner,newUnicornId);
 
         _transfer(0, _owner, newUnicornId);
 
@@ -327,6 +420,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     event CreateUnicorn(address indexed owner, uint indexed UnicornId);
 
     BlackBoxInterface public BlackBoxContract; //onlyOwner
+    address public blackBoxAddress; //onlyOwner
     CandyCoinInterface token; //SET on deploy
 
     uint public subFreezingPrice; //onlyCommunity price in CandyCoins
@@ -347,6 +441,10 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
     mapping (uint => Hybridization) public hybridizations;
 
+    modifier onlyBlackBox() {
+        require(msg.sender == blackBoxAddress);
+        _;
+    }
 
     function UnicornBreeding(address _token, address _dividendManagerAddress) public    {
         token = CandyCoinInterface(_token);
@@ -364,6 +462,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         BlackBoxInterface candidateContract = BlackBoxInterface(_address);
         require(candidateContract.isBlackBox());
         BlackBoxContract = candidateContract;
+        blackBoxAddress = _address;
     }
 
     function setDividendManagerAddress(address _dividendManagerAddress) external onlyCommunity    {
@@ -393,62 +492,62 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     }
 
 
-    function acceptHybridization (uint hybridizationId, uint _unicorn_id) public payable    {
-        Hybridization storage h = hybridizations[hybridizationId];
+    function acceptHybridization (uint _hybridizationId, uint _unicornId) public payable    {
+        Hybridization storage h = hybridizations[_hybridizationId];
         require (!h.accepted);
-        require (keccak256(hybridizationId,h.unicorn_id,h.price)==h.hash);
-        require(owns(msg.sender, _unicorn_id));
-        require(_unicorn_id != h.unicorn_id);
+        require (keccak256(_hybridizationId,h.unicorn_id,h.price)==h.hash);
+        require(owns(msg.sender, _unicornId));
+        require(_unicornId != h.unicorn_id);
 
         //uint price = h.price.add(valueFromPercent(h.price,dividendPercent));
 
         require(msg.value == h.price.add(valueFromPercent(h.price,dividendPercent)));
-        require(isReadyForHybridization(_unicorn_id));
+        require(isReadyForHybridization(_unicornId));
 
-        h.second_unicorn_id = _unicorn_id;
+        h.second_unicorn_id = _unicornId;
 
-        bytes memory newGen = genCore(unicorns[h.unicorn_id].gen,unicorns[h.second_unicorn_id].gen);
-        uint256 new_unicornId = _createUnicorn(newGen, msg.sender);
+        uint256 new_unicornId = _createUnicorn(msg.sender);
+        genCore(new_unicornId, unicorns[h.unicorn_id].gen,unicorns[h.second_unicorn_id].gen);
 
         address own = ownerOf(h.unicorn_id);
         own.transfer(h.price);
 
-        _setFreezing(unicorns[_unicorn_id]);
+        _setFreezing(unicorns[_unicornId]);
 
         h.accepted = true;
-        HybridizationAccepted(hybridizationId, _unicorn_id, new_unicornId);
+        HybridizationAccepted(_hybridizationId, _unicornId, new_unicornId);
+
+        //TODO ?? delete hybridizations[hybridizationId]
     }
 
 
-    function cancelHybridization (uint hybridizationId) public     {
-        Hybridization storage h = hybridizations[hybridizationId];
+    function cancelHybridization (uint _hybridizationId) public     {
+        Hybridization storage h = hybridizations[_hybridizationId];
         require (!h.accepted);
-        require (keccak256(hybridizationId,h.unicorn_id,h.price)==h.hash);
+        require (keccak256(_hybridizationId,h.unicorn_id,h.price)==h.hash);
         require(owns(msg.sender, h.unicorn_id));
 
         h.accepted = true;
 
-        HybridizationCancelled(hybridizationId);
+        HybridizationCancelled(_hybridizationId);
+        //TODO ?? delete hybridizations[hybridizationId]
     }
 
 
-    //TODO RECIVE bytes from BlackBoxContract
+
     //Hybridization
-    function genCore(bytes gen1, bytes gen2) internal pure returns(bytes newGen)    {
-        //byte[108] storge gen =  BlackBoxContract.genCore(gen1,gen2);
-        //for compile;
-        gen1 = gen2;
-        bytes memory gen =gen1;
-        return gen;
+    function genCore(uint _unicornId, bytes _gen1, bytes _gen2) internal    {
+        BlackBoxContract.genCore(_unicornId,_gen1,_gen2);
     }
 
-    //TODO RECIVE bytes from BlackBoxContract
+
     //Create new 0 gen
     function createUnicorn() public payable returns(uint256)   {
         require(msg.value == createUnicornPrice);
-        //bytes memory gen = BlackBoxContract.createGen0();
-        bytes memory gen = new bytes(108);
-        uint256 unicornId = _createUnicorn(gen, msg.sender);
+
+        uint256 unicornId = _createUnicorn(msg.sender);
+        BlackBoxContract.createGen0(unicornId);
+
         CreateUnicorn(msg.sender,unicornId);
         return unicornId;
     }
@@ -519,6 +618,11 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         require(this.balance >= _valueInFinney * 1 finney);
         dividendManagerAddress.transfer(_valueInFinney);
         FoundsTransferd(dividendManagerAddress, _valueInFinney * 1 finney);
+    }
+
+
+    function setGen(uint _unicornId, bytes _gen) onlyBlackBox public {
+        unicorns[_unicornId].gen = _gen;
     }
 
 
