@@ -612,7 +612,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         require(msg.value == createUnicornPrice);
 
         uint256 unicornId = _createUnicorn(msg.sender);
-        BlackBoxContract.createGen0.value(30000000000000000)(unicornId);
+        BlackBoxContract.createGen0(unicornId);
 
         CreateUnicorn(msg.sender,unicornId);
         return unicornId;
