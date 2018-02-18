@@ -99,9 +99,12 @@ contract BlackBoxAccessControl {
 }
 
 
-contract BlackBoxController is BlackBoxAccessControl /*is usingOraclize*/  {
+contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
+
+    using BytesLib for bytes;
 
     event logRes(string res);
+    event LogNewOraclizeQuery(string description);
 
     mapping(bytes32 => uint) validIds; //oraclize query hash -> unicorn_id - 1 for require validIds[hash] > 0
     //only for compile
@@ -111,53 +114,116 @@ contract BlackBoxController is BlackBoxAccessControl /*is usingOraclize*/  {
 
     }
 
-    //TODO
+    function () payable {
+
+    }
+
+    //
     function __callback(bytes32 hash, string result) public {
         require(validIds[hash] > 0);
-        //if (msg.sender != oraclize_cbAddress()) throw;
-        bytes memory gen = bytes(result);
+        require(msg.sender == oraclize_cbAddress());
+
+        bytes memory tmp = bytes(result);
+
+        bytes memory slice = tmp.slice(0, 64);
+        bytes memory tempGen = parseRes(slice);
+        bytes memory gen = tempGen;
+
+        slice = tmp.slice(64, 64);
+        tempGen = parseRes(slice);
+        gen = gen.concat(tempGen);
+
+        slice = tmp.slice(128, 64);
+        tempGen = parseRes(slice);
+        gen = gen.concat(tempGen);
+
+        slice = tmp.slice(192, 64);
+        tempGen = parseRes(slice);
+        gen = gen.concat(tempGen);
+
 
         breedingContract.setGen(validIds[hash] - 1,gen);
         logRes(result);
         delete validIds[hash];
-
     }
 
-    /*function updatePrice() payable {
-        if (oraclize_getPrice("URL") > this.balance) {
+
+    //only UnicornContract;
+    //TODO gas limit
+    function genCore(uint unicornId,bytes gen1, bytes gen2) onlyBreeding public payable returns (bool) {
+        /*if (oraclize_getPrice("URL") > this.balance) {
             LogNewOraclizeQuery("Oraclize query was NOT sent, please add some ETH to cover for the query fee");
+            return false;
         } else {
             LogNewOraclizeQuery("Oraclize query was sent, standing by for the answer..");
             bytes32 queryId =
-            oraclize_query(60, "URL", "json(http://api.fixer.io/latest?symbols=USD,GBP).rates.GBP");
-            validIds[queryId] = true;
-        }
-    }*/
+                oraclize_query("URL", "json(http://core.unicorngo.io/v1/genetics/generate-unicorn).chain", '\n{"unicron_blockchain_id":1,"unicron_owner_id":1}');
 
-    //only UnicornContract;
-    function genCore(uint unicornId,bytes gen1, bytes gen2) onlyBreeding public  returns (bytes32) {
-        //oraclize here
-        bytes32 queryId = block.blockhash(block.number);
-        validIds[queryId] = unicornId + 1; //for require validIds[hash] > 0
+            validIds[queryId] = unicornId + 1; //for require validIds[hash] > 0
+            return true;
+        }*/
+
+
 
         //FOR TEST ONLY;
-        __callback(queryId, 'A76A95918C39eE40d4a43CFAF19C35050E32E271');
+        string memory str = "A76A95918C39eE40d4a43CFAF19C35050E32E271";
+        breedingContract.setGen(unicornId,bytes(str));
+
+        //__callback(queryId, 'A76A95918C39eE40d4a43CFAF19C35050E32E271');
 
         test[gen1] = 1;
         test[gen2] = 1;
 
-        return queryId;
+        return true;
     }
 
-    function createGen0(uint unicornId) onlyBreeding public  returns (bytes32) {
-        //oraclize here
-        bytes32 queryId = block.blockhash(block.number);
-        validIds[queryId] = unicornId + 1;//for require validIds[hash] > 0
+    //TODO gas limit
+    //only UnicornContract;
+    function createGen0(uint unicornId) onlyBreeding public payable returns (bool) {
+        oraclize_setCustomGasPrice(2000000000 wei);
+        if (oraclize_getPrice("URL") > this.balance) {
+            LogNewOraclizeQuery("Oraclize query was NOT sent, please add some ETH to cover for the query fee");
+            return false;
+        } else {
 
-        //FOR TEST ONLY;
-        __callback(queryId, 'A76A95918C39eE40d4a43CFAF19C35050E32E271');
+            string memory str1 = '\n{"unicron_blockchain_id":';
+            //uint2str(unicornId) //real id without - +
+            string memory str2 = ',"unicron_owner_id":';
+            //uint2str(breedingContract.ownerOf(unicornId))
+            string memory str3 = '}';
 
-        return queryId;
+            LogNewOraclizeQuery("Oraclize query was sent, standing by for the answer..");
+
+            bytes32 queryId =
+                oraclize_query("URL", "json(http://core.unicorngo.io/v1/genetics/generate-unicorn).chain", strConcat(str1, uint2str(unicornId), str2,uint2str(breedingContract.ownerOf(unicornId)),str3), 400000);
+
+            validIds[queryId] = unicornId + 1; //for require validIds[hash] > 0
+            return true;
+        }
+    }
+
+
+    function parseRes(bytes tmp) internal pure returns (bytes b){
+        uint160 iaddr = 0;
+        uint160 b1;
+        uint160 b2;
+        for (uint i=0; i<2+2*31; i+=2){
+            iaddr *= 256;
+            b1 = uint160(tmp[i]);
+            b2 = uint160(tmp[i+1]);
+            if ((b1 >= 97)&&(b1 <= 102)) b1 -= 87;
+            else if ((b1 >= 65)&&(b1 <= 70)) b1 -= 55;
+            else if ((b1 >= 48)&&(b1 <= 57)) b1 -= 48;
+            if ((b2 >= 97)&&(b2 <= 102)) b2 -= 87;
+            else if ((b2 >= 65)&&(b2 <= 70)) b2 -= 55;
+            else if ((b2 >= 48)&&(b2 <= 57)) b2 -= 48;
+            iaddr += (b1*16+b2);
+        }
+
+        b = new bytes(32);
+        assembly { mstore(add(b, 32),iaddr) }
+
+        return b;
     }
 
     function isBlackBox() public pure returns (bool) {
@@ -168,8 +234,8 @@ contract BlackBoxController is BlackBoxAccessControl /*is usingOraclize*/  {
 
 contract BlackBoxInterface {
     function isBlackBox() public pure returns (bool);
-    function createGen0(uint unicornId) public  returns (bytes32);
-    function genCore(uint unicornId,bytes gen1, bytes gen2) public  returns (bytes32);
+    function createGen0(uint unicornId) public  returns (bool);
+    function genCore(uint unicornId,bytes gen1, bytes gen2) public  returns (bool);
 }
 
 
@@ -546,7 +612,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         require(msg.value == createUnicornPrice);
 
         uint256 unicornId = _createUnicorn(msg.sender);
-        BlackBoxContract.createGen0(unicornId);
+        BlackBoxContract.createGen0.value(30000000000000000)(unicornId);
 
         CreateUnicorn(msg.sender,unicornId);
         return unicornId;
