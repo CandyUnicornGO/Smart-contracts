@@ -195,7 +195,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
             LogNewOraclizeQuery("Oraclize query was sent, standing by for the answer..");
 
             bytes32 queryId =
-                oraclize_query("URL", "json(http://core.unicorngo.io/v1/genetics/generate-unicorn).chain", strConcat(str1, uint2str(unicornId), str2,uint2str(breedingContract.ownerOf(unicornId)),str3), 400000);
+                oraclize_query("URL", "json(http://core.unicorngo.io/v1/genetics/generate-unicorn).chain", strConcat(str1, uint2str(unicornId), str2,uint2str(1),str3), 400000);
 
             validIds[queryId] = unicornId + 1; //for require validIds[hash] > 0
             return true;
