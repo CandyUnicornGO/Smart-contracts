@@ -114,7 +114,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
         oraclize_setCustomGasPrice(2000000000 wei);
     }
 
-    function () payable {
+    function() public payable {
 
     }
 
@@ -164,7 +164,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     //only UnicornContract;
     function createGen0(uint unicornId) onlyBreeding public payable returns (bool) {
         if (oraclize_getPrice("URL") > this.balance) {
-            LogNewOraclizeQuery("Oraclize query was NOT sent, please add some ETH to cover for the query fee");
+            LogNewOraclizeQuery("GeneCore query was NOT sent, please add some ETH to cover for the query fee");
             return false;
         } else {
 
@@ -174,7 +174,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
             //uint2str(breedingContract.ownerOf(unicornId))
             string memory str3 = '}';
 
-            LogNewOraclizeQuery("Oraclize query was sent, standing by for the answer..");
+            LogNewOraclizeQuery("GeneCore query was sent, standing by for the answer..");
 
             bytes32 queryId =
                 oraclize_query("URL", "json(http://core.unicorngo.io/v1/genetics/generate-unicorn).chain", strConcat(str1, uint2str(unicornId), str2,uint2str(1),str3), 400000);
@@ -247,7 +247,7 @@ contract UnicornAccessControl {
         _;
     }
 
-    function transferOwnership(address newOwner) public onlyOwner {
+    function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0));
         OwnershipTransferred(owner, newOwner);
         owner = newOwner;
@@ -298,9 +298,9 @@ contract UnicornAccessControl {
 }
 
 
-contract UnicornBase is ERC721{
-
-    event Birth(address owner, uint256 unicornId);
+contract UnicornBase is ERC721 {
+    using SafeMath for uint;
+    event  UnicornBirth(address owner, uint256 unicornId);
 
     struct Unicorn {
         bytes gen;
@@ -546,14 +546,15 @@ contract UnicornBase is ERC721{
             gen : new bytes(1),
             birthTime : uint64(now),
             freezingEndTime : 0,
-            freezingIndex : 4//TODO GET FROM GEN
-            });
+            freezingIndex : 4, //TODO GET FROM GEN
+            name: ""
+        });
 
         uint256 _unicornId = totalUnicorns;
         _mint(_owner, _unicornId, _unicorn);
 
         //TODO choose name for event =)
-        Birth(_owner, _unicornId);
+         UnicornBirth(_owner, _unicornId);
 
         return _unicornId;
     }
@@ -581,6 +582,7 @@ contract UnicornBase is ERC721{
         require(tmp.length  == 0);
 
         unicorns[_unicornId].name = _name;
+        return true;
     }
 
 
@@ -612,10 +614,10 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     event HybridizationAdded(uint indexed lastHybridizationId, uint indexed UnicornId, uint price);
     event HybridizationAccepted(uint indexed HybridizationId, uint indexed UnicornId, uint  NewUnicornId);
     event HybridizationCancelled(uint indexed HybridizationId);
-    event FoundsTransferd(address dividendManager, uint value);
+    event FundsTransferd(address dividendManager, uint value);
     event CreateUnicorn(address indexed owner, uint indexed UnicornId);
 
-    BlackBoxInterface public BlackBoxContract; //onlyOwner
+    BlackBoxInterface public blackBoxContract; //onlyOwner
     address public blackBoxAddress; //onlyOwner
     CandyCoinInterface token; //SET on deploy
 
@@ -661,7 +663,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         require(_address != address(0));
         BlackBoxInterface candidateContract = BlackBoxInterface(_address);
         require(candidateContract.isBlackBox());
-        BlackBoxContract = candidateContract;
+        blackBoxContract = candidateContract;
         blackBoxAddress = _address;
     }
 
@@ -708,16 +710,16 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
         h.second_unicorn_id = _unicornId;
 
-        uint256 new_unicornId = _createUnicorn(msg.sender);
-        BlackBoxContract.genCore(new_unicornId,unicorns[h.unicorn_id].gen,unicorns[h.second_unicorn_id].gen);
+        uint256 childUnicornId = _createUnicorn(msg.sender);
+        blackBoxContract.genCore.value(oraclizeFee)(childUnicornId, unicorns[h.unicorn_id].gen, unicorns[h.second_unicorn_id].gen);
 
         address own = ownerOf(h.unicorn_id);
         own.transfer(h.price);
 
-        _setFreezing(unicorns[_unicornId]);
+        _setFreezing(_unicornId);
 
         h.accepted = true;
-        HybridizationAccepted(_hybridizationId, _unicornId, new_unicornId);
+        HybridizationAccepted(_hybridizationId, _unicornId, childUnicornId);
 
         //TODO ?? delete hybridizations[hybridizationId]
     }
@@ -740,10 +742,12 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     function createUnicorn() public payable returns(uint256)   {
         require(msg.value == createUnicornPrice.add(oraclizeFee));
 
-        oraclizeFeeAmount = oraclizeFeeAmount.add(oraclizeFee);
+//        oraclizeFeeAmount = oraclizeFeeAmount.add(oraclizeFee);
 
-        uint256 unicornId = _createUnicorn(msg.sender);
-        BlackBoxContract.createGen0(unicornId);
+        uint256 newUnicornId = _createUnicorn(msg.sender);
+        if (!blackBoxContract.createGen0.value(oraclizeFee)(newUnicornId)) {
+            revert();
+        }
 
         CreateUnicorn(msg.sender,unicornId);
         return unicornId;
@@ -756,8 +760,9 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
 
     //TODO
-    function _setFreezing(Unicorn storage _unicorn) internal    {
-        _unicorn.freezingEndTime = uint64((freezing[_unicorn.freezingIndex]) + uint64(now));
+    function _setFreezing(uint _unicornId) internal {
+        Unicorn storage unicorn = unicorns[_unicornId];
+        unicorn.freezingEndTime = uint64((freezing[unicorn.freezingIndex]) + uint64(now));
     }
 
 
@@ -804,9 +809,9 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
 
     //1% - 100, 10% - 1000 50% - 5000
-    function valueFromPercent(uint _value, uint _percent) public pure returns(uint amount)    {
+    function valueFromPercent(uint _value, uint _percent) internal pure returns (uint amount) {
         uint _amount = _value.mul(_percent).div(10000);
-        return ( _amount);
+        return (_amount);
     }
 
 
@@ -820,13 +825,13 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         //require(this.balance >= _valueInFinney * 1 finney);
         require(this.balance.sub(oraclizeFeeAmount) >= _valueInFinney * 1 finney);
         dividendManagerAddress.transfer(_valueInFinney);
-        FoundsTransferd(dividendManagerAddress, _valueInFinney * 1 finney);
+        FundsTransferd(dividendManagerAddress, _valueInFinney * 1 finney);
     }
 
 
     function transferOraclizeFee() onlyManager public    {
         require(oraclizeFeeAmount > 0);
-        BlackBoxContract.transfer(oraclizeFeeAmount);
+        blackBoxContract.transfer(oraclizeFeeAmount);
         oraclizeFeeAmount = 0;
     }
 
@@ -835,6 +840,9 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         unicorns[_unicornId].gen = _gen;
     }
 
+    //function getGen(uint _unicornId) onlyBlackBox external returns (bytes){
+    //    return unicorns[_unicornId].gen;
+    //}
 
 }
 
