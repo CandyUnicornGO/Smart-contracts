@@ -694,6 +694,12 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     // Mapping from hybridization ID to Hybridization struct
     mapping (uint => Hybridization) public hybridizations;
 
+    // Mapping from unicorn ID to list of it hybridization IDs
+    mapping (uint => uint[]) private unicornHybridizations;
+
+    // Mapping from hybridization ID to index of the unicorn ID hybridizations list
+    mapping(uint => uint) private unicornHybridizationsIndex;
+
     modifier onlyBlackBox() {
         require(msg.sender == blackBoxAddress);
         _;
@@ -749,6 +755,10 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         //        h.accepted = false;
         h.exists = true;
 
+        // save hybridization in mapping for unicorn
+        uint256 newHIndex = unicornHybridizations[h.unicorn_id].length;
+        unicornHybridizations[h.unicorn_id].push(_hybridizationId); //save hybridization ID in array
+        unicornHybridizationsIndex[_hybridizationId] = newHIndex; //save index for hybridization
         //fire event
         HybridizationAdded(_hybridizationId, h.unicorn_id, h.price);
 
@@ -792,12 +802,30 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         //так нельзя, т.к. фронтенд может посчитать, что это выполненная гибридизация
         //h.accepted = true;
 
+
+        // remove hybridization in mapping for unicorn
+        uint256 hIndex = unicornHybridizationsIndex[_hybridizationId];
+        uint256 lastHIndex = unicornHybridizations[h.unicorn_id].length;
+        uint256 lastHId = unicornHybridizations[h.unicorn_id][lastHIndex];
+
+        unicornHybridizations[h.unicorn_id][hIndex] = lastHId; //replace hybridization ID with last
+        unicornHybridizations[h.unicorn_id][lastHIndex] = 0; //reset hybridization ID at last postion
+        unicornHybridizations[h.unicorn_id].length--; //reduce array size
+        //        unicornHybridizationsIndex[_hybridizationId] = 0; // reset hybridization ID index
+        delete unicornHybridizationsIndex[_hybridizationId];
+        unicornHybridizationsIndex[lastHId] = hIndex; //update index for last hybridization ID
+
         //удаляем бесполезную гибридизацию
         delete hybridizations[_hybridizationId];
         //fire event
         HybridizationCancelled(_hybridizationId);
         //TODO ?? delete hybridizations[hybridizationId]
         // да, зачем ее хранить?
+    }
+
+    // Gets the list of hybridizations of unicorn
+    function hybridizationsOf(uint _unicornId) public view returns (uint256[]) {
+        return unicornHybridizations[_unicornId];
     }
 
 
@@ -1006,3 +1034,5 @@ contract Crowdsale {
     }
 
 }
+
+
