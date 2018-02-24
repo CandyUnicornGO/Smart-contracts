@@ -134,7 +134,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     //only UnicornContract;
     //TODO gas limit
     function genCore(uint unicornId, bytes gen1, bytes gen2) onlyBreeding public payable returns (bool) {
-        if (oraclize_getPrice("URL") > this.balance) {
+        if (oraclize_getPrice("URL") >= this.balance) {
             LogNewOraclizeQuery("GeneCore query was NOT sent, please add some ETH to cover for the query fee");
             return false;
         } else {
@@ -174,7 +174,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     //TODO gas limit eth_gasPrice
     //only UnicornContract;
     function createGen0(uint unicornId) onlyBreeding public payable returns (bool) {
-        if (oraclize_getPrice("URL") > this.balance) {
+        if (oraclize_getPrice("URL") >= this.balance) {
 
             LogNewOraclizeQuery("CreateGen0 query was NOT sent, please add some ETH to cover for the query fee");
 
