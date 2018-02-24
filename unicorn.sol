@@ -134,7 +134,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     //only UnicornContract;
     //TODO gas limit
     function genCore(uint unicornId, bytes gen1, bytes gen2) onlyBreeding public payable returns (bool) {
-        if (oraclize_getPrice("URL") > this.balance) {
+        if (oraclize_getPrice("URL") >= this.balance) {
             LogNewOraclizeQuery("GeneCore query was NOT sent, please add some ETH to cover for the query fee");
             return false;
         } else {
@@ -174,7 +174,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     //TODO gas limit eth_gasPrice
     //only UnicornContract;
     function createGen0(uint unicornId) onlyBreeding public payable returns (bool) {
-        if (oraclize_getPrice("URL") > this.balance) {
+        if (oraclize_getPrice("URL") >= this.balance) {
 
             LogNewOraclizeQuery("CreateGen0 query was NOT sent, please add some ETH to cover for the query fee");
 
@@ -654,9 +654,10 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         uint price;
         uint second_unicorn_id;
         bool accepted;
-        bytes32 hash;
+        bool exists;
     }
 
+    // Mapping from hybridization ID to Hybridization struct
     mapping (uint => Hybridization) public hybridizations;
 
     modifier onlyBlackBox() {
@@ -694,47 +695,46 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
 
     //TODO ?? require _unicornId exists in Hybridizations
-    function makeHybridization(uint _unicornId, uint _price)  public returns (uint HybridizationId)    {
+    // думаю, не надо, пусть выставят хоть 100 раз,
+    // может какой-то уникорн будет пользоваться гипер популярностью
+    function makeHybridization(uint _unicornId, uint _price) public returns (uint) {
         require(owns(msg.sender, _unicornId));
         require(isReadyForHybridization(_unicornId));
 
-        lastHybridizationId += 1;
-        Hybridization storage h = hybridizations[lastHybridizationId];
+        uint256 _hybridizationId = ++lastHybridizationId;
+        Hybridization storage h = hybridizations[_hybridizationId];
 
         h.unicorn_id = _unicornId;
         h.price = _price;
+        //it will be set by default
+        //        h.second_unicorn_id = 0;
+        //        h.accepted = false;
+        h.exists = true;
 
-        h.second_unicorn_id = 0;
-        h.accepted = false;
+        //fire event
+        HybridizationAdded(_hybridizationId, h.unicorn_id, h.price);
 
-        h.hash = keccak256(lastHybridizationId,h.unicorn_id,h.price);
-
-        HybridizationAdded(lastHybridizationId, h.unicorn_id,h.price);
-
-        return lastHybridizationId;
+        return _hybridizationId;
     }
 
-
-    function acceptHybridization(uint _hybridizationId, uint _unicornId) public payable    {
-        Hybridization storage h = hybridizations[_hybridizationId];
-        require (!h.accepted);
-        require (keccak256(_hybridizationId,h.unicorn_id,h.price)==h.hash);
+    function acceptHybridization(uint _hybridizationId, uint _unicornId) public payable {
         require(owns(msg.sender, _unicornId));
+
+        Hybridization storage h = hybridizations[_hybridizationId];
+        require(h.exists && !h.accepted);
         require(_unicornId != h.unicorn_id);
 
         //uint price = h.price.add(valueFromPercent(h.price,dividendPercent));
 
-        require(msg.value == h.price.add(valueFromPercent(h.price,dividendPercent)).add(oraclizeFee));
+        require(msg.value == getHybridizationPrice(_hybridizationId));
         require(isReadyForHybridization(_unicornId));
 
         //oraclizeFeeAmount = oraclizeFeeAmount.add(oraclizeFee);
 
         h.second_unicorn_id = _unicornId;
 
-
         uint256 childUnicornId = _createUnicorn(msg.sender);
         blackBoxContract.genCore.value(oraclizeFee)(childUnicornId, unicorns[h.unicorn_id].gen, unicorns[h.second_unicorn_id].gen);
-
 
         address own = ownerOf(h.unicorn_id);
         own.transfer(h.price);
@@ -742,28 +742,33 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         _setFreezing(_unicornId);
 
         h.accepted = true;
+        //fire event
         HybridizationAccepted(_hybridizationId, _unicornId, childUnicornId);
 
         //TODO ?? delete hybridizations[hybridizationId]
+        //удалять гибридизацию не надо, для итории пусть лежит
     }
 
-
-    function cancelHybridization (uint _hybridizationId) public     {
+    function cancelHybridization (uint _hybridizationId) public {
         Hybridization storage h = hybridizations[_hybridizationId];
-        require (!h.accepted);
-        require (keccak256(_hybridizationId,h.unicorn_id,h.price)==h.hash);
         require(owns(msg.sender, h.unicorn_id));
+        require (h.exists && !h.accepted);
 
-        h.accepted = true;
+        //так нельзя, т.к. фронтенд может посчитать, что это выполненная гибридизация
+        //h.accepted = true;
 
+        //удаляем бесполезную гибридизацию
+        delete hybridizations[_hybridizationId];
+        //fire event
         HybridizationCancelled(_hybridizationId);
         //TODO ?? delete hybridizations[hybridizationId]
+        // да, зачем ее хранить?
     }
 
 
     //Create new 0 gen
     function createUnicorn() public payable returns(uint256)   {
-        require(msg.value == createUnicornPrice.add(oraclizeFee));
+        require(msg.value == getCreateUnicornPrice());
 
         //oraclizeFeeAmount = oraclizeFeeAmount.add(oraclizeFee);
 
@@ -792,7 +797,8 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
 
     //change freezing time for candy
-    function subFreezingTime(uint _unicornId) public    {
+    //TODO переименуй функцию, как тебе надо, я ее просто по другому назвал, что глюк убрать
+    function doSubFreezingTime(uint _unicornId) public    {
         require(token.allowance(msg.sender, this) >= subFreezingPrice);
         require(token.transferFrom(msg.sender, this, subFreezingPrice));
 
@@ -832,6 +838,17 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         oraclizeFee = _newFee;
     }
 
+    function getHybridizationPrice(uint _hybridizationId) public view returns (uint) {
+        Hybridization storage h = hybridizations[_hybridizationId];
+        require(h.exists);
+        uint price = h.price.add(valueFromPercent(h.price,dividendPercent)).add(oraclizeFee);
+        return price;
+    }
+
+    function getCreateUnicornPrice() public view returns (uint) {
+        uint price = createUnicornPrice.add(oraclizeFee);
+        return price;
+    }
 
     //1% - 100, 10% - 1000 50% - 5000
     function valueFromPercent(uint _value, uint _percent) internal pure returns (uint amount) {
@@ -840,12 +857,10 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         return (_amount);
     }
 
-
     //TODO
     function withdrawTokens(address _to, uint _value) onlyManager public    {
         token.transfer(_to,_value);
     }
-
 
     function transferEthersToDividendManager(uint _valueInFinney) onlyManager public    {
         require(this.balance >= _valueInFinney * 1 finney);
