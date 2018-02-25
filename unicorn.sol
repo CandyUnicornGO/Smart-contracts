@@ -172,8 +172,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
             validIds[queryId] = unicornId + 1; //for require validIds[hash] > 0
             return true;
 
-
-            {"parents": [{"unicorn_blockchain_id":0,"chain":test},{"unicorn_blockchain_id":1,"chain":test}],"parent_idx": 1,"unicorn_blockchain_id":3}
+//            {"parents": [{"unicorn_blockchain_id":0,"chain":test},{"unicorn_blockchain_id":1,"chain":test}],"parent_idx": 1,"unicorn_blockchain_id":3}
         }
     }
 
@@ -616,7 +615,7 @@ contract UnicornBase is ERC721{
     }
 
     function owns(address _claimant, uint256 _unicornId) public view returns (bool) {
-        return ownerOf(_unicornId) == _claimant &&  ownerOf(_unicornId) != address(0);
+        return ownerOf(_unicornId) == _claimant && ownerOf(_unicornId) != address(0);
     }
 
     function transferFrom(address _from, address _to, uint256 _unicornId) public {
@@ -626,7 +625,7 @@ contract UnicornBase is ERC721{
     }
 
 
-    function setName(uint256 _unicornId, string _name) public onlyOwnerOf(_unicornId) returns (bool) {
+    function setName(uint256 _unicornId, string _name ) public onlyOwnerOf(_unicornId) returns (bool) {
         bytes memory tmp = bytes(unicorns[_unicornId].name);
         require(tmp.length  == 0);
 
@@ -731,6 +730,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         blackBoxContract = candidateContract;
         blackBoxAddress = _address;
     }
+
 
     function setDividendManagerAddress(address _dividendManagerAddress) external onlyCommunity    {
         require(_dividendManagerAddress != address(0));
@@ -841,7 +841,9 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
         gen0Count = gen0Count.add(1);
 
-        blackBoxContract.createGen0.value(oraclizeFee)(newUnicornId,0));
+        if (!blackBoxContract.createGen0.value(oraclizeFee)(newUnicornId,0)) {
+            revert();
+        }
 
         CreateUnicorn(msg.sender,newUnicornId);
         return newUnicornId;
@@ -964,6 +966,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         token.transfer(_to,_value);
     }
 
+
     function transferEthersToDividendManager(uint _valueInFinney) onlyManager public    {
         require(this.balance >= _valueInFinney * 1 finney);
         //require(this.balance.sub(oraclizeFeeAmount) >= _valueInFinney * 1 finney);
@@ -987,6 +990,8 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     }
 
 }
+
+
 
 
 contract Crowdsale {
