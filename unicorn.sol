@@ -625,7 +625,7 @@ contract UnicornBase is ERC721{
     }
 
 
-    function setName(uint256 _unicornId, string _name) public onlyOwnerOf(_unicornId) returns (bool) {
+    function setName(uint256 _unicornId, string _name ) public onlyOwnerOf(_unicornId) returns (bool) {
         bytes memory tmp = bytes(unicorns[_unicornId].name);
         require(tmp.length  == 0);
 
@@ -730,6 +730,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         blackBoxContract = candidateContract;
         blackBoxAddress = _address;
     }
+
 
     function setDividendManagerAddress(address _dividendManagerAddress) external onlyCommunity    {
         require(_dividendManagerAddress != address(0));
@@ -962,6 +963,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         token.transfer(_to,_value);
     }
 
+
     function transferEthersToDividendManager(uint _valueInFinney) onlyManager public    {
         require(this.balance >= _valueInFinney * 1 finney);
         //require(this.balance.sub(oraclizeFeeAmount) >= _valueInFinney * 1 finney);
@@ -985,6 +987,8 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     }
 
 }
+
+
 
 
 contract Crowdsale {
