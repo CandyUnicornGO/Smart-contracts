@@ -625,7 +625,7 @@ contract UnicornBase is ERC721{
     }
 
 
-    function setName(uint256 _unicornId, string _name ) public onlyOwnerOf(_unicornId) returns (bool) {
+    function setName(uint256 _unicornId, string _name) public onlyOwnerOf(_unicornId) returns (bool) {
         bytes memory tmp = bytes(unicorns[_unicornId].name);
         require(tmp.length  == 0);
 
@@ -794,27 +794,26 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         HybridizationAccepted(_hybridizationId, _unicornId, childUnicornId);
     }
 
-    function cancelHybridization (uint _hybridizationId) public     {
+    function cancelHybridization (uint _hybridizationId) public {
         Hybridization storage h = hybridizations[_hybridizationId];
         require(owns(msg.sender, h.unicorn_id));
-        require (h.exists && !h.accepted);
-
-        //так нельзя, т.к. фронтенд может посчитать, что это выполненная гибридизация
-        //h.accepted = true;
-
+        require(h.exists && !h.accepted);
 
         // remove hybridization in mapping for unicorn
         uint256 hIndex = unicornHybridizationsIndex[_hybridizationId];
-        uint256 lastHIndex = unicornHybridizations[h.unicorn_id].length;
+        uint256 lastHIndex = unicornHybridizations[h.unicorn_id].length.sub(1);
         uint256 lastHId = unicornHybridizations[h.unicorn_id][lastHIndex];
 
         unicornHybridizations[h.unicorn_id][hIndex] = lastHId; //replace hybridization ID with last
+        unicornHybridizationsIndex[lastHId] = hIndex; //update index for last hybridization ID
         unicornHybridizations[h.unicorn_id][lastHIndex] = 0; //reset hybridization ID at last postion
         unicornHybridizations[h.unicorn_id].length--; //reduce array size
-        //        unicornHybridizationsIndex[_hybridizationId] = 0; // reset hybridization ID index
-        delete unicornHybridizationsIndex[_hybridizationId];
-        unicornHybridizationsIndex[lastHId] = hIndex; //update index for last hybridization ID
+        unicornHybridizationsIndex[_hybridizationId] = 0; // reset hybridization ID index
 
+
+        //так нельзя, т.к. фронтенд может посчитать, что это выполненная гибридизация
+        //h.accepted = true;
+//        h.exists = false;
         //удаляем бесполезную гибридизацию
         delete hybridizations[_hybridizationId];
         //fire event
@@ -886,7 +885,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
 
     function isReadyForHybridization(uint _unicornId) public view returns (bool)    {
-        return (unicorns[_unicornId].freezingEndTime <= uint64(now));
+        return (unicorns[_unicornId].birthTime > 0 && unicorns[_unicornId].freezingEndTime <= uint64(now));
     }
 
 
@@ -949,7 +948,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
     function getHybridizationPrice(uint _hybridizationId) public view returns (uint) {
         Hybridization storage h = hybridizations[_hybridizationId];
-        require(h.exists);
+//        require(h.exists);
         uint price = h.price.add(valueFromPercent(h.price,dividendPercent)).add(oraclizeFee);
         return price;
     }
