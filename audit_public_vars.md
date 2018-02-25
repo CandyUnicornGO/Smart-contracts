@@ -4,6 +4,46 @@
   - event LogNewOraclizeQuery(string description); - собитие ораклиза, не несет полезной информации, надо заменить на что-то другое
 
 * contract UnicornBreeding 
+    address public owner;
+    address public managerAddress;
+    address public communityAddress;
+
+    bool public paused = false;
+
+    mapping(address => bool) tournaments;//address 1 exists
+    
+     uint32[14] public freezing = [];
+
+
+ BlackBoxInterface public blackBoxContract; //onlyOwner
+    address public blackBoxAddress; //onlyOwner
+    CandyCoinInterface public token; //SET on deploy
+
+    uint public subFreezingPrice; //onlyCommunity price in CandyCoins
+    uint public subFreezingTime; //onlyCommunity
+    uint public dividendPercent; //OnlyManager 4 digits. 10.5% = 1050
+    uint public createUnicornPrice; //OnlyManager price in weis
+    uint public createUnicornPriceInCandy; //OnlyManager price in CandyCoin
+    address public dividendManagerAddress; //onlyCommunity
+
+    uint public gen0Count;
+
+    uint public oraclizeFee;
+
+
+    uint public lastHybridizationId;
+
+    struct Hybridization{
+        uint unicorn_id;
+        uint price;
+        uint second_unicorn_id;
+        bool accepted;
+        bytes32 hash;
+    }
+
+    mapping (uint => Hybridization) public hybridizations;
+
+
   - event Pause(); - не импользуется
   - event Unpause(); - не используется
 
@@ -19,12 +59,10 @@
   - event UnicornBirth(address owner, uint256 unicornId); - по логике дублирует CreateUnicorn - можно убрать 
       
 * contract Crowdsale 
-  - event UnicornPurchase( address indexed beneficiary, uint256 unicornId);
-  - event UnicornSale( address indexed beneficiary, uint256 unicornId);
+  - в работе
   
 * contract UnicornDividendToken
-  - event Transfer(address indexed from, address indexed to, uint256 value);
-  - event Approval(address indexed owner, address indexed spender, uint256 value);
+  - стандарт ERC20
   
 * contract DividendManager
-  - нет  
+  - нет, возможно сделать публичным адрес двивдент токена
