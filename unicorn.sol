@@ -985,8 +985,6 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 }
 
 
-
-
 contract Crowdsale {
 
     Unicorn public token;
