@@ -940,12 +940,6 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         return price;
     }
 
-    //1% - 100, 10% - 1000 50% - 5000
-    function valueFromPercent(uint _value, uint _percent) internal pure returns (uint amount) {
-
-        uint _amount = _value.mul(_percent).div(10000);
-        return (_amount);
-    }
 
     //TODO
     function withdrawTokens(address _to, uint _value) onlyManager public    {
