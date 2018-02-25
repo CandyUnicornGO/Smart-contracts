@@ -949,8 +949,8 @@ contract Crowdsale {
 
     mapping (uint256 => uint256) public prices; // if prices[id] = 0 then not for sale
 
-    event TokenPurchase( address indexed beneficiary, uint256 unicornId);
-    event TokenSale( address indexed beneficiary, uint256 unicornId);
+    event UnicornPurchase( address indexed beneficiary, uint256 unicornId);
+    event UnicornSale( address indexed beneficiary, uint256 unicornId);
 
     function Crowdsale(address _token) public {
         token = UnicornBreeding(_token);
@@ -971,7 +971,7 @@ contract Crowdsale {
         //require(msg.value == price);
 
         //uint unicornId = token.newBirth(beneficiary);
-        //TokenPurchase(msg.sender, unicornId);
+        //UnicornPurchase(msg.sender, unicornId);
 
         //forwardFunds();
     }
@@ -985,7 +985,7 @@ contract Crowdsale {
         own.transfer(prices[unicornId]);
         msg.sender.transfer(dif);  // give change
         prices[unicornId] = 0; // unicorn sold
-        TokenSale(msg.sender, unicornId);
+        UnicornSale(msg.sender, unicornId);
     }
 
 }
