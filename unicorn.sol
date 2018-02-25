@@ -367,7 +367,7 @@ contract UnicornBase is ERC721 {
 
 
     modifier onlyOwnerOf(uint256 _unicornId) {
-        require(ownerOf(_unicornId) == msg.sender);
+        require(owns(msg.sender, _unicornId));
         _;
     }
 
@@ -378,9 +378,10 @@ contract UnicornBase is ERC721 {
     * @return owner address currently marked as the owner of the given unicorn ID
     */
     function ownerOf(uint256 _unicornId) public view returns (address) {
-        address owner = unicornOwner[_unicornId];
-        require(owner != address(0));
-        return owner;
+        return unicornOwner[_unicornId];
+//        address owner = unicornOwner[_unicornId];
+//        require(owner != address(0));
+//        return owner;
     }
 
     function totalSupply() public view returns (uint256) {
@@ -421,7 +422,7 @@ contract UnicornBase is ERC721 {
     * @param _unicornId uint256 ID of the unicorn to query the approval of
     * @return bool whether the msg.sender is approved for the given unicorn ID or not
     */
-    function isApprovedFor(address _owner, uint256 _unicornId) internal view returns (bool) {
+    function allowance(address _owner, uint256 _unicornId) public view returns (bool) {
         return approvedFor(_unicornId) == _owner;
     }
 
@@ -431,11 +432,12 @@ contract UnicornBase is ERC721 {
     * @param _unicornId uint256 ID of the unicorn to be approved
     */
     function approve(address _to, uint256 _unicornId) public onlyOwnerOf(_unicornId) {
-        address owner = ownerOf(_unicornId);
-        require(_to != owner);
+        //модификатор onlyOwnerOf гарантирует, что owner = msg.sender
+//        address owner = ownerOf(_unicornId);
+        require(_to != msg.sender);
         if (approvedFor(_unicornId) != address(0) || _to != address(0)) {
             unicornApprovals[_unicornId] = _to;
-            Approval(owner, _to, _unicornId);
+            Approval(msg.sender, _to, _unicornId);
         }
     }
 
@@ -444,7 +446,7 @@ contract UnicornBase is ERC721 {
     * @param _unicornId uint256 ID of the unicorn being claimed by the msg.sender
     */
     function takeOwnership(uint256 _unicornId) public {
-        require(isApprovedFor(msg.sender, _unicornId));
+        require(allowance(msg.sender, _unicornId));
         clearApprovalAndTransfer(ownerOf(_unicornId), msg.sender, _unicornId);
     }
 
@@ -464,9 +466,9 @@ contract UnicornBase is ERC721 {
     * @param _unicornId uint256 ID of the unicorn to be transferred
     */
     function clearApprovalAndTransfer(address _from, address _to, uint256 _unicornId) internal {
+        require(owns(_from, _unicornId));
         require(_to != address(0));
         require(_to != ownerOf(_unicornId));
-        require(ownerOf(_unicornId) == _from);
 
         clearApproval(_from, _unicornId);
         removeUnicorn(_from, _unicornId);
@@ -479,7 +481,7 @@ contract UnicornBase is ERC721 {
     * @param _unicornId uint256 ID of the unicorn to be transferred
     */
     function clearApproval(address _owner, uint256 _unicornId) private {
-        require(ownerOf(_unicornId) == _owner);
+        require(owns(_owner, _unicornId));
         unicornApprovals[_unicornId] = 0;
         Approval(_owner, 0, _unicornId);
     }
@@ -506,7 +508,7 @@ contract UnicornBase is ERC721 {
     * @param _unicornId uint256 ID of the unicorn to be removed from the unicorns list of the given address
     */
     function removeUnicorn(address _from, uint256 _unicornId) private {
-        require(ownerOf(_unicornId) == _from);
+        require(owns(_from, _unicornId));
 
         uint256 unicornIndex = ownedUnicornsIndex[_unicornId];
         //        uint256 lastUnicornIndex = balanceOf(_from).sub(1);
@@ -556,44 +558,36 @@ contract UnicornBase is ERC721 {
 
     //specific
 
-    function _createUnicorn(address _owner) internal returns (uint)    {
+    function _createUnicorn(address _owner) internal returns (uint) {
         Unicorn memory _unicorn = Unicorn({
             gen : new bytes(1),
             birthTime : uint64(now),
             freezingEndTime : 0,
             freezingIndex : 4, //TODO GET FROM GEN
             name: ""
-            });
+        });
 
 
         uint256 _unicornId = totalUnicorns;
         _mint(_owner, _unicornId, _unicorn);
-
 
         UnicornBirth(_owner, _unicornId);
 
         return _unicornId;
     }
 
-
     function owns(address _claimant, uint256 _unicornId) public view returns (bool) {
         return ownerOf(_unicornId) == _claimant;
     }
 
-
-    function allowance(address _claimant, uint256 _unicornId) public view returns (bool) {
-        return isApprovedFor(_claimant, _unicornId);
-    }
-
-
     function transferFrom(address _from, address _to, uint256 _unicornId) public {
         require(_to != address(this));
-        require(isApprovedFor(msg.sender, _unicornId));
+        require(allowance(msg.sender, _unicornId));
         clearApprovalAndTransfer(_from, _to, _unicornId);
     }
 
 
-    function setName(uint256 _unicornId, string _name ) public onlyOwnerOf(_unicornId) returns (bool) {
+    function setName(uint256 _unicornId, string _name) public onlyOwnerOf(_unicornId) returns (bool) {
         bytes memory tmp = bytes(unicorns[_unicornId].name);
         require(tmp.length  == 0);
 
@@ -762,24 +756,23 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     function cancelHybridization (uint _hybridizationId) public {
         Hybridization storage h = hybridizations[_hybridizationId];
         require(owns(msg.sender, h.unicorn_id));
-        require (h.exists && !h.accepted);
-
-        //так нельзя, т.к. фронтенд может посчитать, что это выполненная гибридизация
-        //h.accepted = true;
-
+        require(h.exists && !h.accepted);
 
         // remove hybridization in mapping for unicorn
         uint256 hIndex = unicornHybridizationsIndex[_hybridizationId];
-        uint256 lastHIndex = unicornHybridizations[h.unicorn_id].length;
+        uint256 lastHIndex = unicornHybridizations[h.unicorn_id].length.sub(1);
         uint256 lastHId = unicornHybridizations[h.unicorn_id][lastHIndex];
 
         unicornHybridizations[h.unicorn_id][hIndex] = lastHId; //replace hybridization ID with last
+        unicornHybridizationsIndex[lastHId] = hIndex; //update index for last hybridization ID
         unicornHybridizations[h.unicorn_id][lastHIndex] = 0; //reset hybridization ID at last postion
         unicornHybridizations[h.unicorn_id].length--; //reduce array size
-        //        unicornHybridizationsIndex[_hybridizationId] = 0; // reset hybridization ID index
-        delete unicornHybridizationsIndex[_hybridizationId];
-        unicornHybridizationsIndex[lastHId] = hIndex; //update index for last hybridization ID
+        unicornHybridizationsIndex[_hybridizationId] = 0; // reset hybridization ID index
 
+
+        //так нельзя, т.к. фронтенд может посчитать, что это выполненная гибридизация
+        //h.accepted = true;
+//        h.exists = false;
         //удаляем бесполезную гибридизацию
         delete hybridizations[_hybridizationId];
         //fire event
@@ -812,7 +805,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
 
     function isReadyForHybridization(uint _unicornId) public view returns (bool)    {
-        return (unicorns[_unicornId].freezingEndTime <= uint64(now));
+        return (unicorns[_unicornId].birthTime > 0 && unicorns[_unicornId].freezingEndTime <= uint64(now));
     }
 
 
@@ -868,7 +861,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
     function getHybridizationPrice(uint _hybridizationId) public view returns (uint) {
         Hybridization storage h = hybridizations[_hybridizationId];
-        require(h.exists);
+//        require(h.exists);
         uint price = h.price.add(valueFromPercent(h.price,dividendPercent)).add(oraclizeFee);
         return price;
     }
