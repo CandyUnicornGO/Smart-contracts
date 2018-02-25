@@ -1033,5 +1033,3 @@ contract Crowdsale {
     }
 
 }
-
-
