@@ -265,7 +265,6 @@ contract UnicornAccessControl {
         _;
     }
 
-
     modifier onlyOLevel() {
         require(
             msg.sender == owner ||
@@ -832,7 +831,6 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     function createUnicorn() public payable returns(uint256)   {
         require(gen0Count <= 30000);
         require(msg.value == getCreateUnicornPrice());
-
         //oraclizeFeeAmount = oraclizeFeeAmount.add(oraclizeFee);
 
         uint256 newUnicornId = _createUnicorn(msg.sender,0,0);
