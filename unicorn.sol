@@ -172,8 +172,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
             validIds[queryId] = unicornId + 1; //for require validIds[hash] > 0
             return true;
 
-
-            {"parents": [{"unicorn_blockchain_id":0,"chain":test},{"unicorn_blockchain_id":1,"chain":test}],"parent_idx": 1,"unicorn_blockchain_id":3}
+//            {"parents": [{"unicorn_blockchain_id":0,"chain":test},{"unicorn_blockchain_id":1,"chain":test}],"parent_idx": 1,"unicorn_blockchain_id":3}
         }
     }
 
@@ -404,7 +403,7 @@ contract UnicornBase is ERC721{
 
 
     modifier onlyOwnerOf(uint256 _unicornId) {
-        require(ownerOf(_unicornId) == msg.sender);
+        require(owns(msg.sender, _unicornId));
         _;
     }
 
@@ -415,9 +414,10 @@ contract UnicornBase is ERC721{
     * @return owner address currently marked as the owner of the given unicorn ID
     */
     function ownerOf(uint256 _unicornId) public view returns (address) {
-        address owner = unicornOwner[_unicornId];
-        require(owner != address(0));
-        return owner;
+        return unicornOwner[_unicornId];
+//        address owner = unicornOwner[_unicornId];
+//        require(owner != address(0));
+//        return owner;
     }
 
     function totalSupply() public view returns (uint256) {
@@ -458,7 +458,7 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to query the approval of
     * @return bool whether the msg.sender is approved for the given unicorn ID or not
     */
-    function isApprovedFor(address _owner, uint256 _unicornId) internal view returns (bool) {
+    function allowance(address _owner, uint256 _unicornId) public view returns (bool) {
         return approvedFor(_unicornId) == _owner;
     }
 
@@ -468,11 +468,12 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to be approved
     */
     function approve(address _to, uint256 _unicornId) public onlyOwnerOf(_unicornId) {
-        address owner = ownerOf(_unicornId);
-        require(_to != owner);
+        //модификатор onlyOwnerOf гарантирует, что owner = msg.sender
+//        address owner = ownerOf(_unicornId);
+        require(_to != msg.sender);
         if (approvedFor(_unicornId) != address(0) || _to != address(0)) {
             unicornApprovals[_unicornId] = _to;
-            Approval(owner, _to, _unicornId);
+            Approval(msg.sender, _to, _unicornId);
         }
     }
 
@@ -481,7 +482,7 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn being claimed by the msg.sender
     */
     function takeOwnership(uint256 _unicornId) public {
-        require(isApprovedFor(msg.sender, _unicornId));
+        require(allowance(msg.sender, _unicornId));
         clearApprovalAndTransfer(ownerOf(_unicornId), msg.sender, _unicornId);
     }
 
@@ -501,9 +502,9 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to be transferred
     */
     function clearApprovalAndTransfer(address _from, address _to, uint256 _unicornId) internal {
+        require(owns(_from, _unicornId));
         require(_to != address(0));
         require(_to != ownerOf(_unicornId));
-        require(ownerOf(_unicornId) == _from);
 
         clearApproval(_from, _unicornId);
         removeUnicorn(_from, _unicornId);
@@ -516,7 +517,7 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to be transferred
     */
     function clearApproval(address _owner, uint256 _unicornId) private {
-        require(ownerOf(_unicornId) == _owner);
+        require(owns(_owner, _unicornId));
         unicornApprovals[_unicornId] = 0;
         Approval(_owner, 0, _unicornId);
     }
@@ -543,7 +544,7 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to be removed from the unicorns list of the given address
     */
     function removeUnicorn(address _from, uint256 _unicornId) private {
-        require(ownerOf(_unicornId) == _from);
+        require(owns(_from, _unicornId));
 
         uint256 unicornIndex = ownedUnicornsIndex[_unicornId];
         //        uint256 lastUnicornIndex = balanceOf(_from).sub(1);
@@ -613,20 +614,13 @@ contract UnicornBase is ERC721{
         return _unicornId;
     }
 
-
     function owns(address _claimant, uint256 _unicornId) public view returns (bool) {
-        return ownerOf(_unicornId) == _claimant;
+        return ownerOf(_unicornId) == _claimant && ownerOf(_unicornId) != address(0);
     }
-
-
-    function allowance(address _claimant, uint256 _unicornId) public view returns (bool) {
-        return isApprovedFor(_claimant, _unicornId);
-    }
-
 
     function transferFrom(address _from, address _to, uint256 _unicornId) public {
         require(_to != address(this));
-        require(isApprovedFor(msg.sender, _unicornId));
+        require(allowance(msg.sender, _unicornId));
         clearApprovalAndTransfer(_from, _to, _unicornId);
     }
 
