@@ -731,7 +731,6 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         blackBoxAddress = _address;
     }
 
-
     function setDividendManagerAddress(address _dividendManagerAddress) external onlyCommunity    {
         require(_dividendManagerAddress != address(0));
         dividendManagerAddress = _dividendManagerAddress;
@@ -975,6 +974,9 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         unicorns[_unicornId].gen = _gen;
     }
 
+    function getGen(uint _unicornId) public view returns (bytes){
+        return unicorns[_unicornId].gen;
+    }
 
     //1% - 100, 10% - 1000 50% - 5000
     function valueFromPercent(uint _value, uint _percent) internal pure returns(uint amount)    {
