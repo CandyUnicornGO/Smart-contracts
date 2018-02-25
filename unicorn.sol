@@ -845,7 +845,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
 
     function isReadyForHybridization(uint _unicornId) public view returns (bool)    {
-        return (unicorns[_unicornId].freezingEndTime <= uint64(now));
+        return (unicorns[_unicornId].birthTime > 0 && unicorns[_unicornId].freezingEndTime <= uint64(now));
     }
 
 
