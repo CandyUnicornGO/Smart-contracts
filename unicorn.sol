@@ -616,7 +616,7 @@ contract UnicornBase is ERC721{
     }
 
     function owns(address _claimant, uint256 _unicornId) public view returns (bool) {
-        return ownerOf(_unicornId) == _claimant;
+        return ownerOf(_unicornId) == _claimant &&  ownerOf(_unicornId) != address(0);
     }
 
     function transferFrom(address _from, address _to, uint256 _unicornId) public {
@@ -841,9 +841,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
         gen0Count = gen0Count.add(1);
 
-        if (!blackBoxContract.createGen0.value(oraclizeFee)(newUnicornId,0)) {
-            revert();
-        }
+        blackBoxContract.createGen0.value(oraclizeFee)(newUnicornId,0));
 
         CreateUnicorn(msg.sender,newUnicornId);
         return newUnicornId;
@@ -978,6 +976,9 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         unicorns[_unicornId].gen = _gen;
     }
 
+    function getGen(uint _unicornId) public view returns (bytes){
+        return unicorns[_unicornId].gen;
+    }
 
     //1% - 100, 10% - 1000 50% - 5000
     function valueFromPercent(uint _value, uint _percent) internal pure returns(uint amount)    {
