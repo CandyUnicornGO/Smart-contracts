@@ -876,7 +876,10 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
         HybridizationCancelled(_hybridizationId);
     }
-
+    // Gets the list of hybridizations of unicorn
+    function hybridizationsOf(uint _unicornId) public view returns (uint256[]) {
+        return unicornHybridizations[_unicornId];
+    }
 
     //Create new 0 gen
     function createUnicorn() public payable whenNotPaused returns(uint256)   {
