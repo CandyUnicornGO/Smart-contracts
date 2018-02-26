@@ -4,23 +4,23 @@
   - event LogNewOraclizeQuery(string description); - собитие ораклиза, не несет полезной информации, надо заменить на что-то другое
 
 * contract UnicornBreeding 
-  - event Pause(); - не импользуется
-  - event Unpause(); - не используется
+  - event GamePaused();
+  - event GameResumed();
 
   - event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
   - event Transfer(address indexed _from, address indexed _to, uint256 _unicornId);  - стандартный event ERC721
   - event Approval(address indexed _owner, address indexed _approved, uint256 _unicornId); - стандартный event ERC721
         
-  - event HybridizationAdded(uint indexed lastHybridizationId, uint indexed UnicornId, uint price);
-  - event HybridizationAccepted(uint indexed HybridizationId, uint indexed UnicornId, uint  NewUnicornId);
-  - event HybridizationCancelled(uint indexed HybridizationId);
-  - event FundsTransferred(address dividendManager, uint value); - перечисление средств на didvidendmanager
+  - event HybridizationAdded(uint indexed lastHybridizationId, uint indexed unicornId, uint price);
+  - event HybridizationAccepted(uint indexed hybridizationId, uint indexed unicornId, uint newUnicornId);
+  - event HybridizationCancelled(uint indexed hybridizationId);  - event FundsTransferred(address dividendManager, uint value); - перечисление средств на didvidendmanager
   - event CreateUnicorn(address indexed owner, uint indexed UnicornId); - создание уникорна
-  - event UnicornBirth(address owner, uint256 unicornId); - по логике дублирует CreateUnicorn - можно убрать 
+  - event UnicornGeneSet(uint indexed unicornId); - установлен ген 
       
-* contract Crowdsale 
-  - event UnicornPurchase( address indexed beneficiary, uint256 unicornId);
-  - event UnicornSale( address indexed beneficiary, uint256 unicornId);
+* contract Crowdsale
+  - event NewOffer(address indexed beneficiary, uint256 unicornId, uint price);
+  - event UnicornSold(address indexed newOwner, uint256 unicornId);
+  - event FundsTransferred(address dividendManager, uint value); 
   
 * contract UnicornDividendToken
   - event Transfer(address indexed from, address indexed to, uint256 value);
