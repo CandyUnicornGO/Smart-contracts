@@ -317,7 +317,7 @@ contract UnicornAccessControl {
 
     address public dividendManagerAddress; //onlyCommunity
 
-    bool public paused = false;
+    bool public paused = true;
 
     mapping(address => bool) tournaments;//address 1 exists
 
