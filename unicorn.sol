@@ -1080,7 +1080,7 @@ contract Crowdsale is UnicornAccessControl {
         // allowance проверяется в transferFrom
 //        require(token.allowance(this,unicornId));
 
-        uint dif = msg.value - getPrice(unicornId);
+        uint diff = msg.value - getPrice(unicornId);
         address owner = token.ownerOf(unicornId);
 
         token.transferFrom(owner, msg.sender, unicornId);
