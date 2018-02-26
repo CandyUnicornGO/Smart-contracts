@@ -1086,7 +1086,7 @@ contract Crowdsale is UnicornAccessControl {
         token.transferFrom(owner, msg.sender, unicornId);
         owner.transfer(prices[unicornId]);
         if (diff > 0) {
-            msg.sender.transfer(dif);  // give change
+            msg.sender.transfer(diff);  // give change
         }
         prices[unicornId] = 0; // unicorn sold
         UnicornSold(msg.sender, unicornId);
