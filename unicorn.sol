@@ -817,10 +817,12 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
         h.unicorn_id = _unicornId;
         h.price = _price;
+        //it will be set by default
+        //        h.second_unicorn_id = 0;
+        //        h.accepted = false;
+        h.exists = true;
 
-        //h.second_unicorn_id = 0;
-        //h.accepted = false;
-
+        // save hybridization in mapping for unicorn
         uint256 newHIndex = unicornHybridizations[h.unicorn_id].length;
         unicornHybridizations[h.unicorn_id].push(_hybridizationId); //save hybridization ID in array
         unicornHybridizationsIndex[_hybridizationId] = newHIndex; //save index for hybridization
