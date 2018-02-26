@@ -108,7 +108,7 @@ contract BlackBoxAccessControl {
     }
 
 
-    function setDividendManagerAddress(address _dividendManagerAddress) external onlyCommunity    {
+    function setDividendManager(address _dividendManagerAddress) external onlyCommunity    {
         require(_dividendManagerAddress != address(0));
         dividendManagerAddress = _dividendManagerAddress;
     }
@@ -168,10 +168,8 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
         breedingContract.setGen(unicornId,gen);
         logRes(result);
 
-
-        uint lastUnicornIdInQueue = queue[--queueSize];
-        requests[lastUnicornIdInQueue].queueIndex = requests[unicornId].queueIndex;
-        queue[requests[unicornId].queueIndex] = lastUnicornIdInQueue;
+        requests[queue[--queueSize]].queueIndex = requests[unicornId].queueIndex;
+        queue[requests[unicornId].queueIndex] = queue[queueSize];
         delete queue[queueSize];
         delete requests[unicornId];
 
@@ -308,8 +306,8 @@ contract BlackBoxInterface {
 
 
 contract UnicornAccessControl {
-    event Pause();
-    event Unpause();
+    event GamePaused();
+    event GameResumed();
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -349,10 +347,7 @@ contract UnicornAccessControl {
 
 
     modifier onlyOLevel() {
-        require(
-            msg.sender == owner ||
-            msg.sender == managerAddress
-        );
+        require(msg.sender == owner || msg.sender == managerAddress);
         _;
     }
 
@@ -361,7 +356,6 @@ contract UnicornAccessControl {
         require(tournaments[msg.sender]);
         _;
     }
-
 
 
     function transferOwnership(address newOwner) external  onlyOwner {
@@ -395,7 +389,7 @@ contract UnicornAccessControl {
     }
 
 
-    function setDividendManagerAddress(address _dividendManagerAddress) external onlyCommunity    {
+    function setDividendManager(address _dividendManagerAddress) external onlyCommunity    {
         require(_dividendManagerAddress != address(0));
         dividendManagerAddress = _dividendManagerAddress;
     }
@@ -418,7 +412,7 @@ contract UnicornAccessControl {
 
     function pause() public onlyOwner whenNotPaused returns (bool) {
         paused = true;
-        Pause();
+        GamePaused();
         return true;
     }
 
@@ -427,7 +421,7 @@ contract UnicornAccessControl {
      */
     function unpause() public onlyOwner whenPaused returns (bool) {
         paused = false;
-        Unpause();
+        GameResumed();
         return true;
     }
 }
@@ -435,12 +429,10 @@ contract UnicornAccessControl {
 
 contract UnicornBase is ERC721{
     using SafeMath for uint;
-    event  UnicornBirth(address owner, uint256 unicornId);
 
     struct Unicorn {
         bytes gen;
-        uint64 birthTime;
-
+        uint birthTime;
         uint freezingEndTime;//TODO ????
         uint freezingTourEndTime;//TODO ????
         uint16 freezingIndex; //TODO ????
@@ -491,7 +483,7 @@ contract UnicornBase is ERC721{
 
 
     modifier onlyOwnerOf(uint256 _unicornId) {
-        require(ownerOf(_unicornId) == msg.sender);
+        require(owns(msg.sender, _unicornId));
         _;
     }
 
@@ -502,9 +494,10 @@ contract UnicornBase is ERC721{
     * @return owner address currently marked as the owner of the given unicorn ID
     */
     function ownerOf(uint256 _unicornId) public view returns (address) {
-        address owner = unicornOwner[_unicornId];
-        require(owner != address(0));
-        return owner;
+        return unicornOwner[_unicornId];
+//        address owner = unicornOwner[_unicornId];
+//        require(owner != address(0));
+//        return owner;
     }
 
     function totalSupply() public view returns (uint256) {
@@ -545,7 +538,7 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to query the approval of
     * @return bool whether the msg.sender is approved for the given unicorn ID or not
     */
-    function isApprovedFor(address _owner, uint256 _unicornId) internal view returns (bool) {
+    function allowance(address _owner, uint256 _unicornId) public view returns (bool) {
         return approvedFor(_unicornId) == _owner;
     }
 
@@ -555,11 +548,12 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to be approved
     */
     function approve(address _to, uint256 _unicornId) public onlyOwnerOf(_unicornId) {
-        address owner = ownerOf(_unicornId);
-        require(_to != owner);
+        //модификатор onlyOwnerOf гарантирует, что owner = msg.sender
+//        address owner = ownerOf(_unicornId);
+        require(_to != msg.sender);
         if (approvedFor(_unicornId) != address(0) || _to != address(0)) {
             unicornApprovals[_unicornId] = _to;
-            Approval(owner, _to, _unicornId);
+            Approval(msg.sender, _to, _unicornId);
         }
     }
 
@@ -568,7 +562,7 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn being claimed by the msg.sender
     */
     function takeOwnership(uint256 _unicornId) public {
-        require(isApprovedFor(msg.sender, _unicornId));
+        require(allowance(msg.sender, _unicornId));
         clearApprovalAndTransfer(ownerOf(_unicornId), msg.sender, _unicornId);
     }
 
@@ -588,9 +582,9 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to be transferred
     */
     function clearApprovalAndTransfer(address _from, address _to, uint256 _unicornId) internal {
+        require(owns(_from, _unicornId));
         require(_to != address(0));
         require(_to != ownerOf(_unicornId));
-        require(ownerOf(_unicornId) == _from);
 
         clearApproval(_from, _unicornId);
         removeUnicorn(_from, _unicornId);
@@ -603,7 +597,7 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to be transferred
     */
     function clearApproval(address _owner, uint256 _unicornId) private {
-        require(ownerOf(_unicornId) == _owner);
+        require(owns(_owner, _unicornId));
         unicornApprovals[_unicornId] = 0;
         Approval(_owner, 0, _unicornId);
     }
@@ -616,8 +610,7 @@ contract UnicornBase is ERC721{
     function addUnicorn(address _to, uint256 _unicornId) private {
         require(unicornOwner[_unicornId] == address(0));
         unicornOwner[_unicornId] = _to;
-        // use direct, due to decrease gas
-        //        uint256 length = balanceOf(_to);
+//        uint256 length = balanceOf(_to);
         uint256 length = ownedUnicorns[_to].length;
         ownedUnicorns[_to].push(_unicornId);
         ownedUnicornsIndex[_unicornId] = length;
@@ -630,7 +623,7 @@ contract UnicornBase is ERC721{
     * @param _unicornId uint256 ID of the unicorn to be removed from the unicorns list of the given address
     */
     function removeUnicorn(address _from, uint256 _unicornId) private {
-        require(ownerOf(_unicornId) == _from);
+        require(owns(_from, _unicornId));
 
         uint256 unicornIndex = ownedUnicornsIndex[_unicornId];
         //        uint256 lastUnicornIndex = balanceOf(_from).sub(1);
@@ -655,13 +648,13 @@ contract UnicornBase is ERC721{
     * @param _to The address that will own the minted unicorn
     * @param _unicornId uint256 ID of the unicorn to be minted by the msg.sender
     */
-    function _mint(address _to, uint256 _unicornId, Unicorn _unicorn) internal {
-        require(_to != address(0));
-        addUnicorn(_to, _unicornId);
-        //store new unicorn data
-        unicorns[_unicornId] = _unicorn;
-        Transfer(0x0, _to, _unicornId);
-    }
+//    function _mint(address _to, uint256 _unicornId, Unicorn _unicorn) internal {
+//        require(_to != address(0));
+//        addUnicorn(_to, _unicornId);
+//        //store new unicorn data
+//        unicorns[_unicornId] = _unicorn;
+//        Transfer(0x0, _to, _unicornId);
+//    }
 
     /**
     * @dev Burns a specific unicorn
@@ -681,39 +674,32 @@ contract UnicornBase is ERC721{
     //specific
 
     function _createUnicorn(address _owner, uint _parent1, uint _parent2) internal returns (uint)    {
-        Unicorn memory _unicorn = Unicorn({
-            gen : new bytes(1),
-            birthTime : uint64(now),
+        require(_owner != address(0));
+        uint256 _unicornId = totalUnicorns;
+        addUnicorn(_owner, _unicornId);
+        //store new unicorn data
+        unicorns[_unicornId] = Unicorn({
+            gen : new bytes(180),
+            birthTime : now,
             freezingEndTime : 0,
             freezingTourEndTime: 0,
             freezingIndex : 4,//TODO GET FROM GEN
-            name: "",
+            name: '',
             parent1_id: _parent1,
             parent2_id: _parent2
-        });
-
-        uint256 _unicornId = totalUnicorns;
-        _mint(_owner, _unicornId, _unicorn);
-
-        UnicornBirth(_owner, _unicornId);
-
+            });
+        Transfer(0x0, _owner, _unicornId);
+//        _mint(_owner, _unicornId, _unicorn);
         return _unicornId;
     }
 
-
     function owns(address _claimant, uint256 _unicornId) public view returns (bool) {
-        return ownerOf(_unicornId) == _claimant;
+        return ownerOf(_unicornId) == _claimant && ownerOf(_unicornId) != address(0);
     }
-
-
-    function allowance(address _claimant, uint256 _unicornId) public view returns (bool) {
-        return isApprovedFor(_claimant, _unicornId);
-    }
-
 
     function transferFrom(address _from, address _to, uint256 _unicornId) public {
         require(_to != address(this));
-        require(isApprovedFor(msg.sender, _unicornId));
+        require(allowance(msg.sender, _unicornId));
         clearApprovalAndTransfer(_from, _to, _unicornId);
     }
 
@@ -751,11 +737,13 @@ contract Unicorn is UnicornBase {
 contract UnicornBreeding is Unicorn, UnicornAccessControl {
     using SafeMath for uint;
 
-    event HybridizationAdded(uint indexed lastHybridizationId, uint indexed UnicornId, uint price);
-    event HybridizationAccepted(uint indexed HybridizationId, uint indexed UnicornId, uint  NewUnicornId);
-    event HybridizationCancelled(uint indexed HybridizationId);
+    event HybridizationAdded(uint indexed lastHybridizationId, uint indexed unicornId, uint price);
+    event HybridizationAccepted(uint indexed hybridizationId, uint indexed unicornId, uint newUnicornId);
+    event HybridizationCancelled(uint indexed hybridizationId);
     event FundsTransferred(address dividendManager, uint value);
-    event CreateUnicorn(address indexed owner, uint indexed UnicornId);
+    event CreateUnicorn(address indexed owner, uint indexed unicornId);
+    event UnicornGeneSet(uint indexed unicornId);
+
 
     BlackBoxInterface public blackBoxContract; //onlyOwner
     address public blackBoxAddress; //onlyOwner
@@ -821,8 +809,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     }
 
 
-    function makeHybridization(uint _unicornId, uint _price)  public returns (uint)    {
-        require(owns(msg.sender, _unicornId));
+    function makeHybridization(uint _unicornId, uint _price) onlyOwnerOf(_unicornId) public returns (uint)    {
         require(isReadyForHybridization(_unicornId));
 
         uint256 _hybridizationId = ++lastHybridizationId;
@@ -844,37 +831,33 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     }
 
 
-    function acceptHybridization(uint _hybridizationId, uint _unicornId) public payable whenNotPaused   {
-        require(owns(msg.sender, _unicornId));
+    function acceptHybridization(uint _hybridizationId, uint _unicornId) onlyOwnerOf(_unicornId) public payable whenNotPaused   {
         Hybridization storage h = hybridizations[_hybridizationId];
         require(h.exists && !h.accepted);
         require(_unicornId != h.unicorn_id);
 
         //require(msg.value == h.price.add(valueFromPercent(h.price,dividendPercent)).add(oraclizeFee));
         require(msg.value == getHybridizationPrice(_hybridizationId));
-        require(isReadyForHybridization(_unicornId));
-        require(isReadyForHybridization(h.unicorn_id));
+        require(isReadyForHybridization(_unicornId) && isReadyForHybridization(h.unicorn_id));
 
         h.second_unicorn_id = _unicornId;
+        // !!!
+        h.accepted = true;
+        _setFreezing(_unicornId);
 
-        uint256 childUnicornId  = _createUnicorn(msg.sender,h.unicorn_id,h.second_unicorn_id);
+        uint256 childUnicornId  = _createUnicorn(msg.sender, h.unicorn_id, h.second_unicorn_id);
         blackBoxContract.genCore.value(oraclizeFee)(childUnicornId, h.unicorn_id, h.second_unicorn_id,
                         string(unicorns[h.unicorn_id].gen), string(unicorns[h.second_unicorn_id].gen));
 
-        address own = ownerOf(h.unicorn_id);
-        own.transfer(h.price);
-
-        _setFreezing(_unicornId);
-
-        h.accepted = true;
+        ownerOf(h.unicorn_id).transfer(h.price);
         HybridizationAccepted(_hybridizationId, _unicornId, childUnicornId);
     }
 
 
     function cancelHybridization (uint _hybridizationId) public     {
         Hybridization storage h = hybridizations[_hybridizationId];
-        require(owns(msg.sender, h.unicorn_id));
         require(h.exists && !h.accepted);
+        require(owns(msg.sender, h.unicorn_id));
 
         // remove hybridization in mapping for unicorn
         uint256 hIndex = unicornHybridizationsIndex[_hybridizationId];
@@ -1037,6 +1020,8 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     //TODO ??? require unicorns[_unicornId].gen != 0
     function setGen(uint _unicornId, bytes _gen) onlyBlackBox public {
         unicorns[_unicornId].gen = _gen;
+        //TODO ??? нужно ли в евенте ген публиковать
+        UnicornGeneSet(_unicornId);
     }
 
 
@@ -1054,7 +1039,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 }
 
 
-contract Crowdsale is UnicornAccessControl{
+contract Crowdsale is UnicornAccessControl {
     using SafeMath for uint;
 
     event NewOffer(address indexed beneficiary, uint256 unicornId, uint price);
@@ -1064,12 +1049,12 @@ contract Crowdsale is UnicornAccessControl{
     Unicorn public token;
 
     uint public dividendPercent; //OnlyManager 4 digits. 10.5% = 1050
-
+    //TODO ?? список уникорнов в продаже
     mapping (uint256 => uint256) public prices; // if prices[id] = 0 then not for sale
 
 
     function Crowdsale(address _token) public {
-        token = UnicornBreeding(_token);
+        token = Unicorn(_token);
         dividendPercent = 375; //3.75%
     }
 
@@ -1092,22 +1077,24 @@ contract Crowdsale is UnicornAccessControl{
     //TODO check if owner change before sold
     function buyUnicorn(uint unicornId) public payable {
         require(msg.value >= getPrice(unicornId));
-        require(token.allowance(this,unicornId));
+        // allowance проверяется в transferFrom
+//        require(token.allowance(this,unicornId));
 
         uint dif = msg.value - getPrice(unicornId);
-        address own = token.ownerOf(unicornId);
+        address owner = token.ownerOf(unicornId);
 
-        token.transferFrom(own, msg.sender,unicornId);
-        own.transfer(prices[unicornId]);
-        msg.sender.transfer(dif);  // give change
+        token.transferFrom(owner, msg.sender, unicornId);
+        owner.transfer(prices[unicornId]);
+        if (diff > 0) {
+            msg.sender.transfer(dif);  // give change
+        }
         prices[unicornId] = 0; // unicorn sold
         UnicornSold(msg.sender, unicornId);
     }
 
 
     function getPrice(uint unicornId) public view returns (uint) {
-        uint price = prices[unicornId].add(valueFromPercent(prices[unicornId],dividendPercent));
-        return price;
+        return prices[unicornId].add(valueFromPercent(prices[unicornId], dividendPercent));
     }
 
 
@@ -1119,7 +1106,6 @@ contract Crowdsale is UnicornAccessControl{
 
     function transferEthersToDividendManager(uint _valueInFinney) onlyManager public    {
         require(this.balance >= _valueInFinney * 1 finney);
-        //require(this.balance.sub(oraclizeFeeAmount) >= _valueInFinney * 1 finney);
         dividendManagerAddress.transfer(_valueInFinney);
         FundsTransferred(dividendManagerAddress, _valueInFinney * 1 finney);
     }
