@@ -301,11 +301,13 @@ contract BlackBoxInterface {
     function createGen0(uint unicornId, uint typeId) public payable;
     function genCore(uint childUnicornId, uint unicorn1_id, uint unicorn2_id) public payable;
 }
-/*
+
 contract UnicornManagementInterface {
     function managerAddress() public returns (address);
     function communityAddress() public returns (address);
     function dividendManagerAddress() public returns (address);
+
+    function paused() public returns (bool);
 }
 
 contract UnicornManagement {
@@ -322,19 +324,39 @@ contract UnicornManagement {
     bool public paused = true;
 
     UnicornManagementInterface unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
+    }
+
+    function UnicornAccessControl() public {
+        owner = msg.sender;
+        managerAddress = msg.sender;
+        communityAddress = msg.sender;
+    }
+
+
+
+    function setManagerAddress(address _newManager) external onlyOwner {
+        require(_newManager != address(0));
+        managerAddress = _newManager;
+    }
+
+    function setCommunity(address _newCommunityAddress) external onlyCommunity {
+        require(_newCommunityAddress != address(0));
+        communityAddress = _newCommunityAddress;
+    }
+
 }
-*/
+
 
 contract UnicornAccessControl {
-    event GamePaused();
-    event GameResumed();
-
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     address public owner;
+    UnicornManagementInterface public unicornManagement;
     address public managerAddress;
     address public communityAddress;
-
     address public dividendManagerAddress; //onlyCommunity
     BlackBoxInterface public blackBoxContract; //onlyOwner
     address public blackBoxAddress; //onlyOwner
@@ -345,9 +367,11 @@ contract UnicornAccessControl {
 
     function UnicornAccessControl() public {
         owner = msg.sender;
-        managerAddress = msg.sender;
-        communityAddress = msg.sender;
-        //        UnicornManagementInterface unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
+//        managerAddress = msg.sender;
+//        communityAddress = msg.sender;
+        UnicornManagementInterface unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
+        unicornManagement.setManagerAddress(msg.sender);
+        unicornManagement.setCommunityAddress(msg.sender);
 //        unicornManagement.setManagerAddress(msg.sender);
     }
 
