@@ -430,13 +430,16 @@ contract UnicornAccessControl {
 }
 
 
-contract UnicornBase is ERC721, UnicornAccessControl{
+contract UnicornBase is ERC721 {
     using SafeMath for uint;
 
     event UnicornGeneSet(uint indexed unicornId);
+    event UnicornFreezingTimeSet(uint indexed unicornId, uint time);
+    event UnicornTourFreezingTimeSet(uint indexed unicornId, uint time);
 
     struct Unicorn {
         bytes gen;
+        //TODO ??? uint или uint64 для времени, вроде с uint опреции стоят дешевле
         uint birthTime;
         uint freezingEndTime;//TODO ????
         uint freezingTourEndTime;//TODO ????
@@ -689,7 +692,6 @@ contract UnicornBase is ERC721, UnicornAccessControl{
             birthTime : now,
             freezingEndTime : 0,
             freezingTourEndTime: 0,
-            freezingIndex : 4,//TODO GET FROM GEN
             name: '',
             parent1_id: _parent1,
             parent2_id: _parent2
@@ -732,27 +734,23 @@ contract UnicornBase is ERC721, UnicornAccessControl{
 
 
     //TODO
-    function setFreezing(uint _unicornId, uint64 _time) public onlyBlackBox {
-        Unicorn storage unicorn = unicorns[_unicornId];
-        unicorn.freezingEndTime = _time;
+    function _setFreezing(uint _unicornId, uint _time) internal {
+        unicorns[_unicornId].freezingEndTime = _time;
+        UnicornFreezingTimeSet(_unicornId, _time);
         //unicorn.freezingEndTime = uint64((freezing[unicorn.freezingIndex]) + uint64(now));
     }
 
-
-    function setTourFreezing(uint _unicornId, uint64 _time) public onlyTournament   {
-        Unicorn storage unicorn = unicorns[_unicornId];
-        unicorn.freezingEndTime = _time;
+    function _setTourFreezing(uint _unicornId, uint _time) internal   {
+        unicorns[_unicornId].freezingEndTime = _time;
+        UnicornTourFreezingTimeSet(_unicornId, _time);
         //unicorn.freezingTourEndTime = uint64((freezing[unicorn.freezingIndex]) + uint64(now));
     }
 
-
-    //TODO ??? require unicorns[_unicornId].gen != 0
-    function setGen(uint _unicornId, bytes _gen) onlyBlackBox public {
+    function _setGen(uint _unicornId, bytes _gen) internal {
         unicorns[_unicornId].gen = _gen;
         //TODO ??? нужно ли в евенте ген публиковать
         UnicornGeneSet(_unicornId);
     }
-
 
     function getGen(uint _unicornId) external view returns (bytes){
         return unicorns[_unicornId].gen;
@@ -768,7 +766,7 @@ contract Unicorn is UnicornBase {
 
 
 
-contract UnicornBreeding is Unicorn {
+contract UnicornBreeding is Unicorn, UnicornAccessControl {
     using SafeMath for uint;
 
     event HybridizationAdded(uint indexed lastHybridizationId, uint indexed unicornId, uint price);
@@ -878,8 +876,7 @@ contract UnicornBreeding is Unicorn {
         //_setFreezing(_unicornId);
 
         uint256 childUnicornId  = _createUnicorn(msg.sender, h.unicorn_id, h.second_unicorn_id);
-        blackBoxContract.genCore.value(oraclizeFee)(childUnicornId, h.unicorn_id, h.second_unicorn_id,
-            string(unicorns[h.unicorn_id].gen), string(unicorns[h.second_unicorn_id].gen));
+        blackBoxContract.genCore.value(oraclizeFee)(childUnicornId, h.unicorn_id, h.second_unicorn_id);
 
         ownerOf(h.unicorn_id).transfer(h.price);
         HybridizationAccepted(_hybridizationId, _unicornId, childUnicornId);
@@ -934,6 +931,7 @@ contract UnicornBreeding is Unicorn {
     function createUnicornForCandy() public whenNotPaused returns(uint256)   {
         require(gen0Count <= 30000);
         //without oraclize fee
+        //TODO allowance проверяется ли в transferFrom?
         require(token.allowance(msg.sender, this) >= createUnicornPriceInCandy);
         require(token.transferFrom(msg.sender, this, createUnicornPriceInCandy));
 
@@ -966,7 +964,7 @@ contract UnicornBreeding is Unicorn {
 
 
     function isReadyForHybridization(uint _unicornId) public view returns (bool)    {
-        return (unicorns[_unicornId].birthTime > 0 && unicorns[_unicornId].freezingEndTime <= uint64(now));
+        return (unicorns[_unicornId].birthTime > 0 && unicorns[_unicornId].freezingEndTime <= now);
     }
 
 
@@ -979,6 +977,20 @@ contract UnicornBreeding is Unicorn {
 
         unicorn.freezingEndTime = unicorn.freezingEndTime.sub(subFreezingTime);
     }
+
+    function setFreezing(uint _unicornId, uint _time) onlyBlackBox public {
+        _setFreezing(_unicornId, _time);
+    }
+
+    function setTourFreezing(uint _unicornId, uint _time) onlyTournament public {
+        _setTourFreezing( _unicornId, _time);
+    }
+
+    //TODO ??? require unicorns[_unicornId].gen != 0
+    function setGen(uint _unicornId, bytes _gen) onlyBlackBox public {
+        _setGen(_unicornId, _gen);
+    }
+
 
 
     //TODO decide roles and requires
@@ -1012,18 +1024,13 @@ contract UnicornBreeding is Unicorn {
         oraclizeFee = _newFee;
     }
 
-
     function getHybridizationPrice(uint _hybridizationId) public view returns (uint) {
         Hybridization storage h = hybridizations[_hybridizationId];
-        //        require(h.exists);
-        uint price = h.price.add(valueFromPercent(h.price,dividendPercent)).add(oraclizeFee);
-        return price;
+        return h.price.add(valueFromPercent(h.price,dividendPercent)).add(oraclizeFee);
     }
 
-
     function getCreateUnicornPrice() public view returns (uint) {
-        uint price = createUnicornPrice.add(oraclizeFee);
-        return price;
+        return createUnicornPrice.add(oraclizeFee);
     }
 
 
