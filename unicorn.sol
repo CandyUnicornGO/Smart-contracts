@@ -123,8 +123,9 @@ contract BlackBoxAccessControl {
 
 contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 
-    event logRes(string res);
     event LogNewOraclizeQuery(string description);
+    event Gene0Request(uint indexed unicornId, uint type);
+    event GeneHybritizationRequest(uint indexed unicornId, uint firstAncestorUnicornId, uint secondAncestorUnicornId);
 
     mapping(bytes32 => uint) validIds; //oraclize query hash -> unicorn_id - 1 for require validIds[hash] > 0
 
@@ -135,7 +136,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 
     mapping(uint => Request) requests;
     // queue_index => unicornId
-    mapping(uint => uint) queue;
+    mapping(uint => uint) public queue;
     uint public queueSize = 0;
 
     string genCoreUrl = "BNh+3fHsYGV1aLs7AFOqzg6Qpu/cLgVGeGQW66SofojiE+ko/YAacNWOkCqJp380tpsw1aIvBj2ITcwYcVy51ODQ4OvsOvhD4va8J97eyjsC8hk86hrQGVYeKta30ZkhbznxyYOeVmL/FkWoq6EQ6X/3hzREPCWljGjh70RoIEKbq30KRVB9YaOKgBfT3heEfg0PA/J9DxLnOmvj9fiSguXLtSzhjbKSUHSg8/D3cxF7o0GX";
