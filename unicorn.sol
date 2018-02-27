@@ -138,8 +138,8 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     mapping(uint => uint) queue;
     uint public queueSize = 0;
 
-    string genCoreUrl = "BNh+3fHsYGV1aLs7AFOqzg6Qpu/cLgVGeGQW66SofojiE+ko/YAacNWOkCqJp380tpsw1aIvBj2ITcwYcVy51ODQ4OvsOvhD4va8J97eyjsC8hk86hrQGVYeKta30ZkhbznxyYOeVmL/FkWoq6EQ6X/3hzREPCWljGjh70RoIEKbq30KRVB9YaOKgBfT3heEfg0PA/J9DxLnOmvj9fiSguXLtSzhjbKSUHSg8/D3cxF7o0GX";
-    string gen0Url = "BLlg1ZpDRC9ap+tEUMlLHsJPHJ/myy5b7S/SoDOzcaq14PttoRuqqFYTvv6rT41NuGJMP67gw/yhD7Me6YwC5tcCWbjSfemh5gdf1H0BZDBmgXPaPtBabN884vBQr+OXmSiQtvk/FKLqBD1MT1XEe5/VLTlg2Fj2kaCFWbYRxYwXZfPEwDaMvwLDRcry6mNpu3ovGoVFpFksob0yAURm1hgr4otdsAzUewvsNKTwxZYmoaTZLsH5PQ==";
+    string genCoreUrl = "BAdL0Wo6ujCMz/QLJL5daj57R00OusTUuymK+XEVmGI8BgjdpUbTYZCLBv0D524Oe9306mZJO6VOMBGjgrni8uGfa6X+Ckc3bsJghmv3ae5vlIpB6Gj0WoljUv0n8wZHENG+zWZsrzNPwc60SVHmmGCgH4fqmtMYPSjIJDMzQhZ2JpG43qrceNyghrB9cMUCvatwOdDUhOou5WvhGGboNvY1HIqtgoenv4FtyUCANt7VLwHkGg==";
+    string gen0Url = "BDymKBpAwjmJ4wwB1OGkJQnn3puTj6dEYUYJ6Ej1yzl6Wh16elvSBKA29Ml23BBKFowk6jfFsR2YWqhdH9kiusY/RZqsdNDH/NstdjKhx36qvmy47q184mzdQaClLbde9LNEw+TC5ya19SVpLj9EBoyEvUf7JIBAbM5mm+gn2iUi/MMCMW3S3hGTSNeH6yPtEFXAni8nIcx5g5YXp3Hw6jstA1IVaHiw2xuY1WiSZJA1fnahBl9mZ6o=";
 
     string Gen0Query1 = '\n{"unicorn_blockchain_id":';
     string Gen0Query2 = ',"type":';
@@ -319,6 +319,8 @@ contract UnicornAccessControl {
     address public communityAddress;
 
     address public dividendManagerAddress; //onlyCommunity
+    BlackBoxInterface public blackBoxContract; //onlyOwner
+    address public blackBoxAddress; //onlyOwner
 
     bool public paused = true;
 
@@ -361,6 +363,12 @@ contract UnicornAccessControl {
     }
 
 
+    modifier onlyBlackBox() {
+        require(msg.sender == blackBoxAddress);
+        _;
+    }
+
+
     function transferOwnership(address newOwner) external  onlyOwner {
         require(newOwner != address(0));
         OwnershipTransferred(owner, newOwner);
@@ -395,6 +403,15 @@ contract UnicornAccessControl {
     function setDividendManager(address _dividendManagerAddress) external onlyCommunity    {
         require(_dividendManagerAddress != address(0));
         dividendManagerAddress = _dividendManagerAddress;
+    }
+
+
+    function setBlackBoxAddress(address _address) external onlyOwner whenPaused    {
+        require(_address != address(0));
+        BlackBoxInterface candidateContract = BlackBoxInterface(_address);
+        require(candidateContract.isBlackBox());
+        blackBoxContract = candidateContract;
+        blackBoxAddress = _address;
     }
 
 
@@ -689,7 +706,6 @@ contract UnicornBase is ERC721, UnicornAccessControl{
             birthTime : now,
             freezingEndTime : 0,
             freezingTourEndTime: 0,
-            freezingIndex : 4,//TODO GET FROM GEN
             name: '',
             parent1_id: _parent1,
             parent2_id: _parent2
@@ -732,14 +748,14 @@ contract UnicornBase is ERC721, UnicornAccessControl{
 
 
     //TODO
-    function setFreezing(uint _unicornId, uint64 _time) public onlyBlackBox {
+    function setFreezing(uint _unicornId, uint _time) public onlyBlackBox {
         Unicorn storage unicorn = unicorns[_unicornId];
         unicorn.freezingEndTime = _time;
         //unicorn.freezingEndTime = uint64((freezing[unicorn.freezingIndex]) + uint64(now));
     }
 
 
-    function setTourFreezing(uint _unicornId, uint64 _time) public onlyTournament   {
+    function setTourFreezing(uint _unicornId, uint _time) public onlyTournament   {
         Unicorn storage unicorn = unicorns[_unicornId];
         unicorn.freezingEndTime = _time;
         //unicorn.freezingTourEndTime = uint64((freezing[unicorn.freezingIndex]) + uint64(now));
@@ -777,9 +793,6 @@ contract UnicornBreeding is Unicorn {
     event FundsTransferred(address dividendManager, uint value);
     event CreateUnicorn(address indexed owner, uint indexed unicornId);
 
-
-    BlackBoxInterface public blackBoxContract; //onlyOwner
-    address public blackBoxAddress; //onlyOwner
     CandyCoinInterface public token; //SET on deploy
 
     uint public subFreezingPrice; //onlyCommunity price in CandyCoins
@@ -809,10 +822,6 @@ contract UnicornBreeding is Unicorn {
     // Mapping from hybridization ID to index of the unicorn ID hybridizations list
     mapping(uint => uint) private unicornHybridizationsIndex;
 
-    modifier onlyBlackBox() {
-        require(msg.sender == blackBoxAddress);
-        _;
-    }
 
 
     function() public payable {
@@ -833,15 +842,6 @@ contract UnicornBreeding is Unicorn {
     }
 
 
-    function setBlackBoxAddress(address _address) external onlyOwner whenPaused    {
-        require(_address != address(0));
-        BlackBoxInterface candidateContract = BlackBoxInterface(_address);
-        require(candidateContract.isBlackBox());
-        blackBoxContract = candidateContract;
-        blackBoxAddress = _address;
-    }
-
-
     function makeHybridization(uint _unicornId, uint _price) onlyOwnerOf(_unicornId) public returns (uint)    {
         require(isReadyForHybridization(_unicornId));
 
@@ -849,7 +849,7 @@ contract UnicornBreeding is Unicorn {
         Hybridization storage h = hybridizations[_hybridizationId];
 
         h.unicorn_id = _unicornId;
-        h.price = _price; 
+        h.price = _price;
         h.exists = true;
 
         // save hybridization in mapping for unicorn
@@ -878,8 +878,7 @@ contract UnicornBreeding is Unicorn {
         //_setFreezing(_unicornId);
 
         uint256 childUnicornId  = _createUnicorn(msg.sender, h.unicorn_id, h.second_unicorn_id);
-        blackBoxContract.genCore.value(oraclizeFee)(childUnicornId, h.unicorn_id, h.second_unicorn_id,
-            string(unicorns[h.unicorn_id].gen), string(unicorns[h.second_unicorn_id].gen));
+        blackBoxContract.genCore.value(oraclizeFee)(childUnicornId, h.unicorn_id, h.second_unicorn_id);
 
         ownerOf(h.unicorn_id).transfer(h.price);
         HybridizationAccepted(_hybridizationId, _unicornId, childUnicornId);
