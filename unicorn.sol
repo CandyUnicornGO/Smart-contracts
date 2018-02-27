@@ -301,8 +301,29 @@ contract BlackBoxInterface {
     function createGen0(uint unicornId, uint typeId) public payable;
     function genCore(uint childUnicornId, uint unicorn1_id, uint unicorn2_id) public payable;
 }
+/*
+contract UnicornManagementInterface {
+    function managerAddress() public returns (address);
+    function communityAddress() public returns (address);
+    function dividendManagerAddress() public returns (address);
+}
 
+contract UnicornManagement {
+    event GamePaused();
+    event GameResumed();
 
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    address public owner;
+    address public managerAddress;
+    address public communityAddress;
+
+    address public dividendManagerAddress; //onlyCommunity
+
+    bool public paused = true;
+
+    UnicornManagementInterface unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
+}
+*/
 
 contract UnicornAccessControl {
     event GamePaused();
@@ -326,6 +347,8 @@ contract UnicornAccessControl {
         owner = msg.sender;
         managerAddress = msg.sender;
         communityAddress = msg.sender;
+        //        UnicornManagementInterface unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
+//        unicornManagement.setManagerAddress(msg.sender);
     }
 
 
@@ -334,9 +357,9 @@ contract UnicornAccessControl {
         _;
     }
 
-
     modifier onlyManager() {
         require(msg.sender == managerAddress);
+//        require(msg.sender == unicornManagement.managerAddress());
         _;
     }
 
