@@ -135,7 +135,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 
     mapping(uint => Request) requests;
     // queue_index => unicornId
-    mapping(uint => uint) queue;
+    mapping(uint => uint) public queue;
     uint public queueSize = 0;
 
     string genCoreUrl = "BAdL0Wo6ujCMz/QLJL5daj57R00OusTUuymK+XEVmGI8BgjdpUbTYZCLBv0D524Oe9306mZJO6VOMBGjgrni8uGfa6X+Ckc3bsJghmv3ae5vlIpB6Gj0WoljUv0n8wZHENG+zWZsrzNPwc60SVHmmGCgH4fqmtMYPSjIJDMzQhZ2JpG43qrceNyghrB9cMUCvatwOdDUhOou5WvhGGboNvY1HIqtgoenv4FtyUCANt7VLwHkGg==";
