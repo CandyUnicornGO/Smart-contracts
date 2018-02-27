@@ -139,8 +139,8 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     mapping(uint => uint) public queue;
     uint public queueSize = 0;
 
-    string genCoreUrl = "BNh+3fHsYGV1aLs7AFOqzg6Qpu/cLgVGeGQW66SofojiE+ko/YAacNWOkCqJp380tpsw1aIvBj2ITcwYcVy51ODQ4OvsOvhD4va8J97eyjsC8hk86hrQGVYeKta30ZkhbznxyYOeVmL/FkWoq6EQ6X/3hzREPCWljGjh70RoIEKbq30KRVB9YaOKgBfT3heEfg0PA/J9DxLnOmvj9fiSguXLtSzhjbKSUHSg8/D3cxF7o0GX";
-    string gen0Url = "BLlg1ZpDRC9ap+tEUMlLHsJPHJ/myy5b7S/SoDOzcaq14PttoRuqqFYTvv6rT41NuGJMP67gw/yhD7Me6YwC5tcCWbjSfemh5gdf1H0BZDBmgXPaPtBabN884vBQr+OXmSiQtvk/FKLqBD1MT1XEe5/VLTlg2Fj2kaCFWbYRxYwXZfPEwDaMvwLDRcry6mNpu3ovGoVFpFksob0yAURm1hgr4otdsAzUewvsNKTwxZYmoaTZLsH5PQ==";
+    string genCoreUrl = "BAdL0Wo6ujCMz/QLJL5daj57R00OusTUuymK+XEVmGI8BgjdpUbTYZCLBv0D524Oe9306mZJO6VOMBGjgrni8uGfa6X+Ckc3bsJghmv3ae5vlIpB6Gj0WoljUv0n8wZHENG+zWZsrzNPwc60SVHmmGCgH4fqmtMYPSjIJDMzQhZ2JpG43qrceNyghrB9cMUCvatwOdDUhOou5WvhGGboNvY1HIqtgoenv4FtyUCANt7VLwHkGg==";
+    string gen0Url = "BDymKBpAwjmJ4wwB1OGkJQnn3puTj6dEYUYJ6Ej1yzl6Wh16elvSBKA29Ml23BBKFowk6jfFsR2YWqhdH9kiusY/RZqsdNDH/NstdjKhx36qvmy47q184mzdQaClLbde9LNEw+TC5ya19SVpLj9EBoyEvUf7JIBAbM5mm+gn2iUi/MMCMW3S3hGTSNeH6yPtEFXAni8nIcx5g5YXp3Hw6jstA1IVaHiw2xuY1WiSZJA1fnahBl9mZ6o=";
 
     string Gen0Query1 = '\n{"unicorn_blockchain_id":';
     string Gen0Query2 = ',"type":';
@@ -320,6 +320,8 @@ contract UnicornAccessControl {
     address public communityAddress;
 
     address public dividendManagerAddress; //onlyCommunity
+    BlackBoxInterface public blackBoxContract; //onlyOwner
+    address public blackBoxAddress; //onlyOwner
 
     bool public paused = true;
 
@@ -362,6 +364,12 @@ contract UnicornAccessControl {
     }
 
 
+    modifier onlyBlackBox() {
+        require(msg.sender == blackBoxAddress);
+        _;
+    }
+
+
     function transferOwnership(address newOwner) external  onlyOwner {
         require(newOwner != address(0));
         OwnershipTransferred(owner, newOwner);
@@ -399,6 +407,15 @@ contract UnicornAccessControl {
     }
 
 
+    function setBlackBoxAddress(address _address) external onlyOwner whenPaused    {
+        require(_address != address(0));
+        BlackBoxInterface candidateContract = BlackBoxInterface(_address);
+        require(candidateContract.isBlackBox());
+        blackBoxContract = candidateContract;
+        blackBoxAddress = _address;
+    }
+
+
     /*** Pausable functionality adapted from OpenZeppelin ***/
 
     /// @dev Modifier to allow actions only when the contract IS NOT paused
@@ -431,7 +448,7 @@ contract UnicornAccessControl {
 }
 
 
-contract UnicornBase is ERC721 {
+contract UnicornBase is ERC721, UnicornAccessControl{
     using SafeMath for uint;
 
     event UnicornGeneSet(uint indexed unicornId);
@@ -735,19 +752,21 @@ contract UnicornBase is ERC721 {
 
 
     //TODO
-    function _setFreezing(uint _unicornId, uint _time) internal {
+    function setFreezing(uint _unicornId, uint _time) public onlyBlackBox {
         unicorns[_unicornId].freezingEndTime = _time;
         UnicornFreezingTimeSet(_unicornId, _time);
         //unicorn.freezingEndTime = uint64((freezing[unicorn.freezingIndex]) + uint64(now));
     }
 
-    function _setTourFreezing(uint _unicornId, uint _time) internal   {
+    function setTourFreezing(uint _unicornId, uint _time) public onlyTournament   {
         unicorns[_unicornId].freezingEndTime = _time;
         UnicornTourFreezingTimeSet(_unicornId, _time);
         //unicorn.freezingTourEndTime = uint64((freezing[unicorn.freezingIndex]) + uint64(now));
     }
 
-    function _setGen(uint _unicornId, bytes _gen) internal {
+
+    //TODO ??? require unicorns[_unicornId].gen != 0
+    function setGen(uint _unicornId, bytes _gen) onlyBlackBox public {
         unicorns[_unicornId].gen = _gen;
         //TODO ??? нужно ли в евенте ген публиковать
         UnicornGeneSet(_unicornId);
@@ -767,7 +786,7 @@ contract Unicorn is UnicornBase {
 
 
 
-contract UnicornBreeding is Unicorn, UnicornAccessControl {
+contract UnicornBreeding is Unicorn {
     using SafeMath for uint;
 
     event HybridizationAdded(uint indexed lastHybridizationId, uint indexed unicornId, uint price);
@@ -776,9 +795,6 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     event FundsTransferred(address dividendManager, uint value);
     event CreateUnicorn(address indexed owner, uint indexed unicornId);
 
-
-    BlackBoxInterface public blackBoxContract; //onlyOwner
-    address public blackBoxAddress; //onlyOwner
     CandyCoinInterface public token; //SET on deploy
 
     uint public subFreezingPrice; //onlyCommunity price in CandyCoins
@@ -808,10 +824,6 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     // Mapping from hybridization ID to index of the unicorn ID hybridizations list
     mapping(uint => uint) private unicornHybridizationsIndex;
 
-    modifier onlyBlackBox() {
-        require(msg.sender == blackBoxAddress);
-        _;
-    }
 
 
     function() public payable {
@@ -832,15 +844,6 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
     }
 
 
-    function setBlackBoxAddress(address _address) external onlyOwner whenPaused    {
-        require(_address != address(0));
-        BlackBoxInterface candidateContract = BlackBoxInterface(_address);
-        require(candidateContract.isBlackBox());
-        blackBoxContract = candidateContract;
-        blackBoxAddress = _address;
-    }
-
-
     function makeHybridization(uint _unicornId, uint _price) onlyOwnerOf(_unicornId) public returns (uint)    {
         require(isReadyForHybridization(_unicornId));
 
@@ -848,7 +851,7 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
         Hybridization storage h = hybridizations[_hybridizationId];
 
         h.unicorn_id = _unicornId;
-        h.price = _price; 
+        h.price = _price;
         h.exists = true;
 
         // save hybridization in mapping for unicorn
@@ -978,20 +981,6 @@ contract UnicornBreeding is Unicorn, UnicornAccessControl {
 
         unicorn.freezingEndTime = unicorn.freezingEndTime.sub(subFreezingTime);
     }
-
-    function setFreezing(uint _unicornId, uint _time) onlyBlackBox public {
-        _setFreezing(_unicornId, _time);
-    }
-
-    function setTourFreezing(uint _unicornId, uint _time) onlyTournament public {
-        _setTourFreezing( _unicornId, _time);
-    }
-
-    //TODO ??? require unicorns[_unicornId].gen != 0
-    function setGen(uint _unicornId, bytes _gen) onlyBlackBox public {
-        _setGen(_unicornId, _gen);
-    }
-
 
 
     //TODO decide roles and requires
