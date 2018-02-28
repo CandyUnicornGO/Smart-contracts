@@ -30,26 +30,26 @@ library SafeMath {
     }
 }
 
-contract CandyCoinInterface {
-    uint256 public totalSupply;
-    function balanceOf(address who) public view returns (uint256);
-    function transfer(address to, uint256 value) public returns (bool);
-    function allowance(address owner, address spender) public view returns (uint256);
-    function transferFrom(address from, address to, uint256 value) public returns (bool);
-    function approve(address spender, uint256 value) public returns (bool);
-}
-
-contract BlackBoxInterface {
-    function isBlackBox() public returns (bool);
-    function createGen0(uint unicornId, uint typeId) public payable;
-    function genCore(uint childUnicornId, uint unicorn1Id, uint unicorn2Id) public payable;
-}
-
-contract UnicornBreedingInterface {
-    function setFreezing(uint _unicornId, uint _time) public;
-    function setTourFreezing(uint _unicornId, uint _time) public;
-    function setGen(uint _unicornId, bytes _gen) public;
-}
+//contract CandyCoinInterface {
+//    uint256 public totalSupply;
+//    function balanceOf(address who) public view returns (uint256);
+//    function transfer(address to, uint256 value) public returns (bool);
+//    function allowance(address owner, address spender) public view returns (uint256);
+//    function transferFrom(address from, address to, uint256 value) public returns (bool);
+//    function approve(address spender, uint256 value) public returns (bool);
+//}
+//
+//contract BlackBoxInterface {
+//    function isBlackBox() public returns (bool);
+//    function createGen0(uint unicornId, uint typeId) public payable;
+//    function genCore(uint childUnicornId, uint unicorn1Id, uint unicorn2Id) public payable;
+//}
+//
+//contract UnicornBreedingInterface {
+//    function setFreezing(uint _unicornId, uint _time) public;
+//    function setTourFreezing(uint _unicornId, uint _time) public;
+//    function setGen(uint _unicornId, bytes _gen) public;
+//}
 
 contract UnicornManagement {
     using SafeMath for uint;
@@ -60,14 +60,14 @@ contract UnicornManagement {
     address public candyToken;
 
     address public dividendManagerAddress; //onlyCommunity
-    address public blackBoxAddress; //onlyOwner
-    address public breedingAddress; //onlyOwner
+//    address public blackBoxAddress; //onlyOwner
+//    address public breedingAddress; //onlyOwner
 
     uint public createDividendPercent = 375; //OnlyManager 4 digits. 10.5% = 1050
     uint public sellDividendPercent = 375; //OnlyManager 4 digits. 10.5% = 1050
     uint public subFreezingPrice = 1000000000000000000; // 0.01 ETH
-    uint public subFreezingTime = 1 hours;
-    uint public createUnicornPrice = 10000000000000000;
+    uint64 public subFreezingTime = 1 hours;
+    uint public createUnicornPrice = 50000000000000000;
     uint public createUnicornPriceInCandy = 1000000000000000000; //1 token
     uint public oraclizeFee = 3000000000000000; //0.003 ETH
     bool public paused = true;
@@ -125,9 +125,9 @@ contract UnicornManagement {
         candyToken = _candyToken;
     }
 
-    function getCandyToken() external view returns (CandyCoinInterface) {
-        return CandyCoinInterface(candyToken);
-    }
+    //    function getCandyToken() external returns (CandyCoinInterface) {
+    //        return CandyCoinInterface(candyToken);
+    //    }
 
     function setManagerAddress(address _managerAddress) external onlyOwner {
         require(_managerAddress != address(0));
@@ -177,32 +177,26 @@ contract UnicornManagement {
         return tournaments[_tournamentAddress];
     }
 
-    function setBlackBox(address _blackBoxAddress) external onlyOwner whenPaused {
-        require(_blackBoxAddress != address(0));
-        //TODO насколько необходима такая проверка?
-        //TODO мы же не проверяем isBreeding при записи его адреса в ББ
-        //TODO даже если криворукий овнер установит нерпавильный контракт - игра все равно на паузе и есть время исправить
-        //        BlackBoxInterface candidateContract = BlackBoxInterface(_blackBoxAddress);
-        //        require(candidateContract.isBlackBox());
-        //        blackBoxContract = candidateContract;
-        blackBoxAddress = _blackBoxAddress;
-        NewBlackBoxAddress(_blackBoxAddress);
-    }
+//    function setBlackBox(address _blackBoxAddress) external onlyOwner whenPaused {
+//        require(_blackBoxAddress != address(0));
+//        blackBoxAddress = _blackBoxAddress;
+//        NewBlackBoxAddress(_blackBoxAddress);
+//    }
 
-    function getBlackBox() external view returns (BlackBoxInterface) {
-        return BlackBoxInterface(blackBoxAddress);
-    }
+    //    function getBlackBox() external returns (BlackBoxInterface) {
+    //        return BlackBoxInterface(blackBoxAddress);
+    //    }
 
-    function setBreeding(address _breedingAddress) external onlyOwner whenPaused {
-        require(_breedingAddress != address(0));
-        breedingAddress = _breedingAddress;
-        NewBreedingAddress(_breedingAddress);
-//        breedingContract = UnicornBreeding(breedingAddress);
-    }
+//    function setBreeding(address _breedingAddress) external onlyOwner whenPaused {
+//        require(_breedingAddress != address(0));
+//        breedingAddress = _breedingAddress;
+//        NewBreedingAddress(_breedingAddress);
+//        //        breedingContract = UnicornBreeding(breedingAddress);
+//    }
 
-    function getBreeding() external view returns (UnicornBreedingInterface) {
-        return UnicornBreedingInterface(breedingAddress);
-    }
+    //    function getBreeding() external  returns (UnicornBreedingInterface) {
+    //        return UnicornBreedingInterface(breedingAddress);
+    //    }
 
 
     function transferOwnership(address _ownerAddress) external onlyOwner {
@@ -237,7 +231,7 @@ contract UnicornManagement {
 
     //TODO decide roles and requires
     //time in minutes
-    function setSubFreezingTime(uint _time) external onlyCommunity {
+    function setSubFreezingTime(uint64 _time) external onlyCommunity {
         subFreezingTime = _time * 1 minutes;
         NewSubFreezingTime(_time);
     }
@@ -250,15 +244,19 @@ contract UnicornManagement {
         NewCreateUnicornPrice(_price, _candyPrice);
     }
 
-    function getCreateUnicornPrice() external view returns (uint) {
+    function getCreateUnicornFullPrice() external view returns (uint) {
         return createUnicornPrice.add(oraclizeFee);
     }
 
-    function getHybridizationPrice(uint _price) external view returns (uint) {
+    function getCreateUnicornFullPriceInCandy() external view returns (uint) {
+        return createUnicornPriceInCandy;
+    }
+
+    function getHybridizationFullPrice(uint _price) external view returns (uint) {
         return _price.add(valueFromPercent(_price, createDividendPercent)).add(oraclizeFee);
     }
 
-    function getSellUnicornPrice(uint _price) external view returns (uint) {
+    function getSellUnicornFullPrice(uint _price) external view returns (uint) {
         return _price.add(valueFromPercent(_price, sellDividendPercent)).add(oraclizeFee);
     }
 

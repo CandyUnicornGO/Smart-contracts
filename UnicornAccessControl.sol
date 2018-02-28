@@ -1,25 +1,44 @@
-pragma solidity ^0.4.0;
+pragma solidity ^0.4.18;
 
-contract CandyCoinInterface {
-    uint256 public totalSupply;
-    function balanceOf(address who) public view returns (uint256);
-    function transfer(address to, uint256 value) public returns (bool);
-    function allowance(address owner, address spender) public view returns (uint256);
-    function transferFrom(address from, address to, uint256 value) public returns (bool);
-    function approve(address spender, uint256 value) public returns (bool);
-}
-contract BlackBoxInterface {
-    function isBlackBox() public returns (bool);
-    function createGen0(uint unicornId, uint typeId) public payable;
-    function genCore(uint childUnicornId, uint unicorn1Id, uint unicorn2Id) public payable;
-}
+//contract CandyCoinInterface {
+//    uint256 public totalSupply;
+//    function balanceOf(address who) public view returns (uint256);
+//    function transfer(address to, uint256 value) public returns (bool);
+//    function allowance(address owner, address spender) public view returns (uint256);
+//    function transferFrom(address from, address to, uint256 value) public returns (bool);
+//    function approve(address spender, uint256 value) public returns (bool);
+//}
+//contract BlackBoxInterface {
+//    function isBlackBox() public returns (bool);
+//    function createGen0(uint unicornId, uint typeId) public payable;
+//    function genCore(uint childUnicornId, uint unicorn1Id, uint unicorn2Id) public payable;
+//}
 
-contract UnicornBreedingInterface {
-    function setFreezing(uint _unicornId, uint _time) public;
-    function setTourFreezing(uint _unicornId, uint _time) public;
-    function setGen(uint _unicornId, bytes _gen) public;
-}
+//contract UnicornBreedingInterface {
+//    function setFreezing(uint _unicornId, uint _time) public;
+//    function setTourFreezing(uint _unicornId, uint _time) public;
+//    function setGen(uint _unicornId, bytes _gen) public;
+//}
 contract UnicornManagementInterface {
+
+//    address public ownerAddress;
+//    address public managerAddress;
+//    address public communityAddress;
+//    address public candyToken;
+//
+//    address public dividendManagerAddress; //onlyCommunity
+//    address public blackBoxAddress; //onlyOwner
+//    address public breedingAddress; //onlyOwner
+//
+//    uint public createDividendPercent;
+//    uint public sellDividendPercent;
+//    uint public subFreezingPrice;
+//    uint public subFreezingTime;
+//    uint public createUnicornPrice;
+//    uint public createUnicornPriceInCandy;
+//    uint public oraclizeFee;
+//    bool public paused;
+
     function ownerAddress() public returns (address);
     function managerAddress() public returns (address);
     function communityAddress() public returns (address);
@@ -31,7 +50,7 @@ contract UnicornManagementInterface {
     function createDividendPercent() public returns (uint); //OnlyManager 4 digits. 10.5% = 1050
     function sellDividendPercent() public returns (uint); //OnlyManager 4 digits. 10.5% = 1050
     function subFreezingPrice() public returns (uint); // 0.01 ETH
-    function subFreezingTime() public returns (uint);
+    function subFreezingTime() public returns (uint64);
     function createUnicornPrice() public returns (uint);
     function createUnicornPriceInCandy() public returns (uint); //1 token
     function oraclizeFee() public returns (uint); //0.003 ETH
