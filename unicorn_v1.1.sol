@@ -127,7 +127,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     string genCoreQuery1 = '\n{"parents": [{"unicorn_blockchain_id":';
 
 
-    function BlackBoxController(address _unicornManagementAddress) BlackBoxAccessControl(_unicornManagementAddress) public {
+    function BlackBoxController(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
         oraclize_setCustomGasPrice(2000000000 wei);
     }
 
