@@ -30,27 +30,6 @@ library SafeMath {
     }
 }
 
-//contract CandyCoinInterface {
-//    uint256 public totalSupply;
-//    function balanceOf(address who) public view returns (uint256);
-//    function transfer(address to, uint256 value) public returns (bool);
-//    function allowance(address owner, address spender) public view returns (uint256);
-//    function transferFrom(address from, address to, uint256 value) public returns (bool);
-//    function approve(address spender, uint256 value) public returns (bool);
-//}
-//
-//contract BlackBoxInterface {
-//    function isBlackBox() public returns (bool);
-//    function createGen0(uint unicornId, uint typeId) public payable;
-//    function genCore(uint childUnicornId, uint unicorn1Id, uint unicorn2Id) public payable;
-//}
-//
-//contract UnicornBreedingInterface {
-//    function setFreezing(uint _unicornId, uint _time) public;
-//    function setTourFreezing(uint _unicornId, uint _time) public;
-//    function setGen(uint _unicornId, bytes _gen) public;
-//}
-
 contract UnicornManagement {
     using SafeMath for uint;
 
@@ -58,10 +37,9 @@ contract UnicornManagement {
     address public managerAddress;
     address public communityAddress;
     address public candyToken;
-
     address public dividendManagerAddress; //onlyCommunity
-//    address public blackBoxAddress; //onlyOwner
-//    address public breedingAddress; //onlyOwner
+    //    address public blackBoxAddress; //onlyOwner
+    //    address public breedingAddress; //onlyOwner
 
     uint public createDividendPercent = 375; //OnlyManager 4 digits. 10.5% = 1050
     uint public sellDividendPercent = 375; //OnlyManager 4 digits. 10.5% = 1050
@@ -83,7 +61,7 @@ contract UnicornManagement {
     event NewCreateUnicornPrice(uint price, uint priceCandy);
     event NewOraclizeFee(uint fee);
     event NewSubFreezingPrice(uint price);
-    event NewSubFreezingTime(uint tim3);
+    event NewSubFreezingTime(uint time);
     event NewCreateUnicornPrice(uint price);
     event NewCreateDividendPercent(uint percent);
     event NewSellDividendPercent(uint percent);
@@ -91,7 +69,6 @@ contract UnicornManagement {
     event DelTournament(address tournamentAddress);
     event NewBlackBoxAddress(address blackBoxAddress);
     event NewBreedingAddress(address breedingAddress);
-    //    UnicornManagementInterface unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
 
     modifier onlyOwner() {
         require(msg.sender == ownerAddress);
@@ -124,10 +101,6 @@ contract UnicornManagement {
         communityAddress = msg.sender;
         candyToken = _candyToken;
     }
-
-    //    function getCandyToken() external returns (CandyCoinInterface) {
-    //        return CandyCoinInterface(candyToken);
-    //    }
 
     function setManagerAddress(address _managerAddress) external onlyOwner {
         require(_managerAddress != address(0));
@@ -183,20 +156,12 @@ contract UnicornManagement {
 //        NewBlackBoxAddress(_blackBoxAddress);
 //    }
 
-    //    function getBlackBox() external returns (BlackBoxInterface) {
-    //        return BlackBoxInterface(blackBoxAddress);
-    //    }
-
 //    function setBreeding(address _breedingAddress) external onlyOwner whenPaused {
 //        require(_breedingAddress != address(0));
 //        breedingAddress = _breedingAddress;
 //        NewBreedingAddress(_breedingAddress);
 //        //        breedingContract = UnicornBreeding(breedingAddress);
 //    }
-
-    //    function getBreeding() external  returns (UnicornBreedingInterface) {
-    //        return UnicornBreedingInterface(breedingAddress);
-    //    }
 
 
     function transferOwnership(address _ownerAddress) external onlyOwner {
@@ -216,7 +181,7 @@ contract UnicornManagement {
     }
 
     //in weis
-    function setOraclizeFee(uint _fee) external onlyManager    {
+    function setOraclizeFee(uint _fee) external onlyManager {
         oraclizeFee = _fee;
         NewOraclizeFee(_fee);
     }

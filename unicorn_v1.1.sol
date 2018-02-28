@@ -45,8 +45,6 @@ contract CandyCoinInterface {
 }
 
 contract UnicornBreedingInterface {
-    //    function setFreezing(uint _unicornId) public;
-    //    function setTourFreezing(uint _unicornId) public;
     function setGen(uint _unicornId, bytes _gen) public;
 }
 
@@ -260,10 +258,6 @@ contract UnicornBreedingAccessControl is UnicornAccessControl {
     BlackBoxInterface internal blackBoxContract; //onlyOwner
     mapping(address => bool) tournaments;//address 1 exists
 
-    //    function UnicornBreedingAccessControl(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-    //    }
-
-
     modifier onlyBlackBox() {
         require(msg.sender == blackBoxAddress);
         _;
@@ -348,9 +342,6 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
         require(owns(msg.sender, _unicornId));
         _;
     }
-
-    //    function UnicornBase(address _unicornManagementAddress) UnicornBreedingAccessControl(_unicornManagementAddress) public {
-    //    }
 
     /**
     * @dev Gets the owner of the specified unicorn ID
