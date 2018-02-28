@@ -71,10 +71,11 @@ contract UnicornManagementInterface {
 //    function setOraclizeFee(uint _fee) external;
 //    function setSubFreezingPrice(uint _price) external;
 //    function setSubFreezingTime(uint _time) external;
-    function setCreateUnicornPrice(uint _price, uint _candyPrice) external;
-    function getCreateUnicornPrice() external view returns (uint);
-    function getHybridizationPrice(uint _price) external view returns (uint);
+    function setCreateUnicornFullPrice(uint _price, uint _candyPrice) external;
+    function getCreateUnicornFullPrice() external view returns (uint);
+    function getHybridizationFullPrice(uint _price) external view returns (uint);
     function getSellUnicornPrice(uint _price) external view returns (uint);
+    function getCreateUnicornFullPriceInCandy() external view returns (uint);
     function pause() public;
     function unpause() public;
 }

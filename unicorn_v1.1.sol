@@ -80,6 +80,10 @@ contract BlackBoxAccessControl is UnicornAccessControl {
         //
     }
 
+    function public isGamePaused() external view returns (bool) {
+        return unicornManagement.paused();
+    }
+
     modifier onlyBreeding() {
         require(msg.sender == breedingAddress);
         _;
@@ -262,9 +266,14 @@ contract UnicornBreedingAccessControl is UnicornAccessControl {
     //    function UnicornBreedingAccessControl(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
     //    }
 
+
     modifier onlyBlackBox() {
         require(msg.sender == blackBoxAddress);
         _;
+    }
+
+    function public isGamePaused() external view returns (bool) {
+        return unicornManagement.paused();
     }
 
     function setBlackBoxAddress(address _blackBoxAddress) external onlyOwner whenPaused    {
@@ -813,7 +822,7 @@ contract UnicornBreeding is UnicornBase {
         return unicornManagement.getHybridizationFullPrice(h.price);
     }
     function getCreateUnicornPriceInCandy() public view returns (uint) {
-        return unicornManagement.createUnicornPriceInCandy();
+        return unicornManagement.getCreateUnicornFullPriceInCandy();
     }
 
     function getCreateUnicornPrice() public view returns (uint) {
