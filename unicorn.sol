@@ -123,10 +123,14 @@ contract BlackBoxAccessControl {
 
 contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 
-    event logRes(string res);
+//    event logRes(string res);
     event LogNewOraclizeQuery(string description);
     event Gene0Request(uint indexed unicornId, uint unicornType);
     event GeneHybritizationRequest(uint indexed unicornId, uint firstAncestorUnicornId, uint secondAncestorUnicornId);
+
+
+    event Gene0RequestRetry(uint indexed unicornId);
+    event GeneHybritizationRequestRetry(uint indexed unicornId);
 
     mapping(bytes32 => uint) validIds; //oraclize query hash -> unicorn_id - 1 for require validIds[hash] > 0
 
@@ -168,12 +172,14 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
         uint unicornId = validIds[hash] - 1;
 
         breedingContract.setGen(unicornId,gen);
-        logRes(result);
+//        logRes(result);
 
-        requests[queue[--queueSize]].queueIndex = requests[unicornId].queueIndex;
-        queue[requests[unicornId].queueIndex] = queue[queueSize];
-        delete queue[queueSize];
-        delete requests[unicornId];
+        if (bytes(requests[unicornId].request).length > 0) {
+            requests[queue[--queueSize]].queueIndex = requests[unicornId].queueIndex;
+            queue[requests[unicornId].queueIndex] = queue[queueSize];
+            delete queue[queueSize];
+            delete requests[unicornId];
+        }
 
         delete validIds[hash];
     }
@@ -182,7 +188,6 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     //TODO gas limit
     function genCore(uint childUnicornId, uint unicorn1_id, uint unicorn2_id) onlyBreeding public payable {
         if (oraclize_getPrice("URL") > this.balance) {
-            // LogNewOraclizeQuery("GeneCore query was NOT sent, please add some ETH to cover for the query fee");
             revert();
         } else {
 
@@ -191,8 +196,6 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
                     '},{"unicorn_blockchain_id":', uint2str(unicorn2_id), '}],"parent_idx": 1,"unicorn_blockchain_id":');
 
             query = strConcat(query, uint2str(childUnicornId), '}');
-
-            LogNewOraclizeQuery("GeneCore query was sent, standing by for the answer..");
 
             bytes32 queryId = oraclize_query("URL", genCoreUrl, query, 400000);
 
@@ -204,19 +207,17 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
             queue[requests[childUnicornId].queueIndex] = childUnicornId;
 
             validIds[queryId] = childUnicornId + 1; //for require validIds[hash] > 0
+            GeneHybritizationRequest(childUnicornId, unicorn1_id, unicorn2_id);
         }
     }
 
     //TODO gas limit eth_gasPrice
     function createGen0(uint _unicornId, uint _type) onlyBreeding public payable {
         if (oraclize_getPrice("URL") > this.balance) {
-            // LogNewOraclizeQuery("CreateGen0 query was NOT sent, please add some ETH to cover for the query fee");
             revert();
         } else {
 
             string memory query = strConcat(Gen0Query1, uint2str(_unicornId), Gen0Query2, uint2str(_type), Gen0Query3);
-
-            LogNewOraclizeQuery("CreateGen0 query was sent, standing by for the answer..");
 
             bytes32 queryId = oraclize_query("URL", gen0Url, query, 400000);
 
@@ -228,7 +229,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
             queue[requests[_unicornId].queueIndex] = _unicornId;
 
             validIds[queryId] = _unicornId + 1; //for require validIds[hash] > 0
-
+            Gene0Request(_unicornId, _type);
         }
     }
 
@@ -267,32 +268,28 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 
     //TODO gas limit
     function genCoreManual(uint _unicornId) onlyOwner public {
+        require(bytes(requests[_unicornId].request).length > 0);
         if (oraclize_getPrice("URL") > this.balance) {
             revert();
         } else {
-
-            LogNewOraclizeQuery("GeneCore Manual query was sent, standing by for the answer..");
-
             bytes32 queryId = oraclize_query("URL", genCoreUrl, requests[_unicornId].request, 400000);
 
-
             validIds[queryId] = _unicornId + 1; //for require validIds[hash] > 0
-
+            GeneHybritizationRequestRetry(_unicornId);
         }
     }
 
     //TODO gas limit eth_gasPrice
     function createGen0Manual(uint _unicornId) onlyOwner public payable {
+        require(bytes(requests[_unicornId].request).length > 0);
         if (oraclize_getPrice("URL") > this.balance) {
             // LogNewOraclizeQuery("CreateGen0 query was NOT sent, please add some ETH to cover for the query fee");
             revert();
         } else {
-            LogNewOraclizeQuery("CreateGen0 query was sent, standing by for the answer..");
-
             bytes32 queryId = oraclize_query("URL", gen0Url, requests[_unicornId].request, 400000);
 
             validIds[queryId] = _unicornId + 1; //for require validIds[hash] > 0
-
+            Gene0RequestRetry(_unicornId);
         }
     }
 
@@ -739,7 +736,7 @@ contract UnicornBase is ERC721, UnicornAccessControl{
 
     function setName(uint256 _unicornId, string _name ) public onlyOwnerOf(_unicornId) returns (bool) {
         bytes memory tmp = bytes(unicorns[_unicornId].name);
-        require(tmp.length  == 0);
+        require(tmp.length == 0);
 
         unicorns[_unicornId].name = _name;
         return true;
@@ -747,20 +744,20 @@ contract UnicornBase is ERC721, UnicornAccessControl{
 
 
     function _setFreezing(uint _unicornId) internal {
-        unicorns[_unicornId].freezingEndTime = uint64(_getfreezTime(getUnicornGenByte(_unicornId, 168))) + uint64(now);
+        unicorns[_unicornId].freezingEndTime = uint64(_getfreezTime(getUnicornGenByte(_unicornId, 168)) + now);
+        UnicornTourFreezingTimeSet(_unicornId, unicorns[_unicornId].freezingEndTime);
+
     }
 
 
     function setTourFreezing(uint _unicornId) public onlyTournament   {
-        unicorns[_unicornId].freezingTourEndTime = uint64(_getfreezTime(getUnicornGenByte(_unicornId, 168))) + uint64(now);
-//        UnicornFreezingTimeSet(_unicornId, _time);
-        //unicorn.freezingEndTime = uint64((freezing[unicorn.freezingIndex]) + uint64(now));
+        unicorns[_unicornId].freezingTourEndTime = uint64(_getfreezTime(getUnicornGenByte(_unicornId, 168)) + now);
+        UnicornFreezingTimeSet(_unicornId, unicorns[_unicornId].freezingTourEndTime);
     }
 
 
     function _getfreezTime(uint freezingIndex) internal view returns (uint) {
-        return freezing[freezingIndex] + ((uint(block.blockhash(block.number-1))>>3) % freezingPlusCount[freezingIndex] * 1 hours);
-//        UnicornTourFreezingTimeSet(_unicornId, _time);
+        return now + freezing[freezingIndex] + ((uint(block.blockhash(block.number-1))>>3) % freezingPlusCount[freezingIndex] * 1 hours);
         //unicorn.freezingTourEndTime = uint64((freezing[unicorn.freezingIndex]) + uint64(now));
     }
 
