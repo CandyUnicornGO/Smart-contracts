@@ -76,9 +76,6 @@ contract BlackBoxAccessControl is UnicornAccessControl {
     address public breedingAddress;
     UnicornBreedingInterface internal breedingContract;
 
-    function BlackBoxAccessControl(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        //
-    }
 
     function public isGamePaused() external view returns (bool) {
         return unicornManagement.paused();
