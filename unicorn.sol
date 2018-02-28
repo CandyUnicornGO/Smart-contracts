@@ -125,7 +125,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 
     event logRes(string res);
     event LogNewOraclizeQuery(string description);
-    event Gene0Request(uint indexed unicornId, uint type);
+    event Gene0Request(uint indexed unicornId, uint unicornType);
     event GeneHybritizationRequest(uint indexed unicornId, uint firstAncestorUnicornId, uint secondAncestorUnicornId);
 
     mapping(bytes32 => uint) validIds; //oraclize query hash -> unicorn_id - 1 for require validIds[hash] > 0
@@ -797,10 +797,10 @@ contract UnicornBreeding is Unicorn {
     event FundsTransferred(address dividendManager, uint value);
     event CreateUnicorn(address indexed owner, uint indexed unicornId);
 
-    CandyCoinInterface public token; //SET on deploy
+    CandyCoinInterface public candyToken; //SET on deploy
 
     uint public subFreezingPrice; //onlyCommunity price in CandyCoins
-    uint public subFreezingTime; //onlyCommunity
+    uint64 public subFreezingTime; //onlyCommunity
     uint public dividendPercent; //OnlyManager 4 digits. 10.5% = 1050
     uint public createUnicornPrice; //OnlyManager price in weis
     uint public createUnicornPriceInCandy; //OnlyManager price in CandyCoin
@@ -834,7 +834,7 @@ contract UnicornBreeding is Unicorn {
 
 
     function UnicornBreeding(address _token) public    {
-        token = CandyCoinInterface(_token);
+        candyToken = CandyCoinInterface(_token);
         lastHybridizationId = 0;
         subFreezingPrice = 1000000000000000000;
         subFreezingTime = 5 minutes;
@@ -937,9 +937,9 @@ contract UnicornBreeding is Unicorn {
     function createUnicornForCandy() public whenNotPaused returns(uint256)   {
         require(gen0Count <= 30000);
         //without oraclize fee
-        //TODO allowance проверяется ли в transferFrom?
-        require(token.allowance(msg.sender, this) >= createUnicornPriceInCandy);
-        require(token.transferFrom(msg.sender, this, createUnicornPriceInCandy));
+        //allowance проверяется в transferFrom
+//        require(candyToken.allowance(msg.sender, this) >= createUnicornPriceInCandy);
+        require(candyToken.transferFrom(msg.sender, this, createUnicornPriceInCandy));
 
         uint256 newUnicornId = _createUnicorn(msg.sender,0,0);
 
@@ -976,12 +976,12 @@ contract UnicornBreeding is Unicorn {
 
     //change freezing time for candy
     function minusFreezingTime(uint _unicornId) public    {
-        require(token.allowance(msg.sender, this) >= subFreezingPrice);
-        require(token.transferFrom(msg.sender, this, subFreezingPrice));
+        require(candyToken.allowance(msg.sender, this) >= subFreezingPrice);
+        require(candyToken.transferFrom(msg.sender, this, subFreezingPrice));
 
         Unicorn storage unicorn = unicorns[_unicornId];
 
-        unicorn.freezingEndTime = unicorn.freezingEndTime.sub(subFreezingTime);
+        unicorn.freezingEndTime = unicorn.freezingEndTime < subFreezingTime ? 0 : unicorn.freezingEndTime - subFreezingTime;
     }
 
 
@@ -994,7 +994,7 @@ contract UnicornBreeding is Unicorn {
     //TODO decide roles and requires
     //time in minutes
     function setSubFreezingTime(uint _newTime) public onlyCommunity    {
-        subFreezingTime = _newTime * 1 minutes;
+        subFreezingTime = uint64(_newTime * 1 minutes);
     }
 
     //TODO decide roles and requires
@@ -1028,7 +1028,7 @@ contract UnicornBreeding is Unicorn {
 
     //TODO
     function withdrawTokens(address _to, uint _value) onlyManager public    {
-        token.transfer(_to,_value);
+        candyToken.transfer(_to,_value);
     }
 
 
