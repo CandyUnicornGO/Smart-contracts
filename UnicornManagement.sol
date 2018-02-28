@@ -42,11 +42,13 @@ contract CandyCoinInterface {
 contract BlackBoxInterface {
     function isBlackBox() public returns (bool);
     function createGen0(uint unicornId, uint typeId) public payable;
-    function genCore(uint childUnicornId, uint unicorn1_id, uint unicorn2_id) public payable;
+    function genCore(uint childUnicornId, uint unicorn1Id, uint unicorn2Id) public payable;
 }
 
 contract UnicornBreedingInterface {
-
+    function setFreezing(uint _unicornId, uint _time) public;
+    function setTourFreezing(uint _unicornId, uint _time) public;
+    function setGen(uint _unicornId, bytes _gen) public;
 }
 
 contract UnicornManagement {
@@ -55,33 +57,40 @@ contract UnicornManagement {
     address public ownerAddress;
     address public managerAddress;
     address public communityAddress;
+    address public candyToken;
 
     address public dividendManagerAddress; //onlyCommunity
     address public blackBoxAddress; //onlyOwner
     address public breedingAddress; //onlyOwner
+
     uint public createDividendPercent = 375; //OnlyManager 4 digits. 10.5% = 1050
     uint public sellDividendPercent = 375; //OnlyManager 4 digits. 10.5% = 1050
-    bool public paused = true;
     uint public subFreezingPrice = 1000000000000000000; // 0.01 ETH
-    uint public subFreezingTime = 5 minutes;
+    uint public subFreezingTime = 1 hours;
     uint public createUnicornPrice = 10000000000000000;
     uint public createUnicornPriceInCandy = 1000000000000000000; //1 token
     uint public oraclizeFee = 3000000000000000; //0.003 ETH
-    CandyCoinInterface public candyToken;
+    bool public paused = true;
+
     mapping(address => bool) tournaments;//address 1 exists
 
     event GamePaused();
     event GameResumed();
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-    event ManagerAddress(address managerAddress);
-    event CommunityAddress(address communityAddress);
-    event DividendManager(address dividendManagerAddress);
-    event CreateDividendPercent(uint percent);
-    event SellDividendPercent(uint percent);
+    event NewManagerAddress(address managerAddress);
+    event NewCommunityAddress(address communityAddress);
+    event NewDividendManagerAddress(address dividendManagerAddress);
+    event NewCreateUnicornPrice(uint price, uint priceCandy);
+    event NewOraclizeFee(uint fee);
+    event NewSubFreezingPrice(uint price);
+    event NewSubFreezingTime(uint tim3);
+    event NewCreateUnicornPrice(uint price);
+    event NewCreateDividendPercent(uint percent);
+    event NewSellDividendPercent(uint percent);
     event AddTournament(address tournamentAddress);
     event DelTournament(address tournamentAddress);
-    event BlackBoxAddress(address blackBoxAddress);
-    event BreedingAddress(address breedingAddress);
+    event NewBlackBoxAddress(address blackBoxAddress);
+    event NewBreedingAddress(address breedingAddress);
     //    UnicornManagementInterface unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
 
     modifier onlyOwner() {
@@ -113,11 +122,11 @@ contract UnicornManagement {
         ownerAddress = msg.sender;
         managerAddress = msg.sender;
         communityAddress = msg.sender;
-        candyToken = CandyCoinInterface(_candyToken);
+        candyToken = _candyToken;
     }
 
     function getCandyToken() external view returns (CandyCoinInterface) {
-        return candyToken;
+        return CandyCoinInterface(candyToken);
     }
 
     function setManagerAddress(address _managerAddress) external onlyOwner {
@@ -246,7 +255,7 @@ contract UnicornManagement {
     }
 
     function getHybridizationPrice(uint _price) external view returns (uint) {
-        return price.add(valueFromPercent(_price, createDividendPercent)).add(oraclizeFee);
+        return _price.add(valueFromPercent(_price, createDividendPercent)).add(oraclizeFee);
     }
 
     //1% - 100, 10% - 1000 50% - 5000

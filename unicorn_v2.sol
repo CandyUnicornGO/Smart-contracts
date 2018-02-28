@@ -712,8 +712,8 @@ contract UnicornBreeding is Unicorn {
         require(gen0Count <= 30000);
         //without oraclize fee
         //TODO allowance проверяется ли в transferFrom?
-        require(unicornManagement.candyToken.allowance(msg.sender, this) >= unicornManagement.createUnicornPriceInCandy);
-        require(unicornManagement.candyToken.transferFrom(msg.sender, this, unicornManagement.createUnicornPriceInCandy));
+        require((unicornManagement.getCandyToken()).allowance(msg.sender, this) >= unicornManagement.createUnicornPriceInCandy);
+        require((unicornManagement.getCandyToken()).transferFrom(msg.sender, this, unicornManagement.createUnicornPriceInCandy));
 
         uint256 newUnicornId = _createUnicorn(msg.sender, 0, 0);
 
@@ -750,8 +750,8 @@ contract UnicornBreeding is Unicorn {
 
     //change freezing time for candy
     function minusFreezingTime(uint _unicornId) public {
-        require(unicornManagement.candyToken.allowance(msg.sender, this) >= unicornManagement.subFreezingPrice);
-        require(unicornManagement.candyToken.transferFrom(msg.sender, this, unicornManagement.subFreezingPrice));
+        require((unicornManagement.getCandyToken()).allowance(msg.sender, this) >= unicornManagement.subFreezingPrice);
+        require((unicornManagement.getCandyToken()).transferFrom(msg.sender, this, unicornManagement.subFreezingPrice));
 
         Unicorn storage unicorn = unicorns[_unicornId];
 
