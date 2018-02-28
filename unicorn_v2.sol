@@ -1,6 +1,6 @@
 pragma solidity ^0.4.18;
 
-import "./UnicornAccessControll.sol";
+import "./UnicornAccessControl.sol";
 import "./deploy.sol";
 
 library SafeMath {
@@ -55,7 +55,7 @@ contract ERC721 {
 }
 
 
-contract BlackBoxController is UnicornAccessControll, usingOraclize {
+contract BlackBoxController is UnicornAccessControl, usingOraclize {
 
     bool public isBlackBox = true;
     event LogNewOraclizeQuery(string description);
@@ -84,7 +84,7 @@ contract BlackBoxController is UnicornAccessControll, usingOraclize {
     string genCoreQuery1 = '\n{"parents": [{"unicorn_blockchain_id":';
 
 
-    function BlackBoxController(address _unicornManagement) UnicornAccessControll(_unicornManagement) public {
+    function BlackBoxController(address _unicornManagement) UnicornAccessControl(_unicornManagement) public {
         oraclize_setCustomGasPrice(2000000000 wei);
     }
 
@@ -239,7 +239,7 @@ contract BlackBoxInterface {
 
 
 
-contract UnicornBase is ERC721, UnicornAccessControll {
+contract UnicornBase is ERC721, UnicornAccessControl {
     using SafeMath for uint;
 
     event UnicornGeneSet(uint indexed unicornId);
@@ -596,7 +596,7 @@ contract UnicornBreeding is Unicorn {
     function() public payable {
 
     }
-    function UnicornBreeding(address _unicornManagement) UnicornAccessControll(_unicornManagement) public {
+    function UnicornBreeding(address _unicornManagement) UnicornAccessControl(_unicornManagement) public {
 //        token = CandyCoinInterface(_token);
         lastHybridizationId = 0;
 //        subFreezingPrice = 1000000000000000000;

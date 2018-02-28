@@ -247,7 +247,7 @@ contract UnicornManagement {
     function setCreateUnicornPrice(uint _price, uint _candyPrice) external onlyManager {
         createUnicornPrice = _price;
         createUnicornPriceInCandy = _candyPrice;
-        NewCreateUnicornPrice(_price, _candyPrice)
+        NewCreateUnicornPrice(_price, _candyPrice);
     }
 
     function getCreateUnicornPrice() external view returns (uint) {
@@ -256,6 +256,10 @@ contract UnicornManagement {
 
     function getHybridizationPrice(uint _price) external view returns (uint) {
         return _price.add(valueFromPercent(_price, createDividendPercent)).add(oraclizeFee);
+    }
+
+    function getSellUnicornPrice(uint _price) external view returns (uint) {
+        return _price.add(valueFromPercent(_price, sellDividendPercent)).add(oraclizeFee);
     }
 
     //1% - 100, 10% - 1000 50% - 5000
