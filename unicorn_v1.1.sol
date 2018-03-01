@@ -1938,7 +1938,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
     function countBreedeeng(uint childId, uint sireId, uint mateId) internal {
         unicorns[sireId].asSire = unicorns[sireId].asSire.add(1);
         unicorns[mateId].asMate = unicorns[mateId].asMate.add(1);
-        unicorns[childId].breed = min(unicorns[sireId].breed, unicorns[mateId].breed);
+        unicorns[childId].breed = min(unicorns[sireId].breed, unicorns[mateId].breed).add(1);
     }
 
 //    function max(uint a, uint b) private pure returns (uint) {
