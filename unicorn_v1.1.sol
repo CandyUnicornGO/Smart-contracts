@@ -1403,7 +1403,7 @@ contract BlackBoxAccessControl is UnicornAccessControl {
         _;
     }
 
-    function setBreeding(address _breedingAddress) onlyOwner whenNotPaused external {
+    function setBreeding(address _breedingAddress) onlyOwner whenPaused external {
         require(_breedingAddress != address(0));
         breedingAddress = _breedingAddress;
         breedingContract = UnicornBreedingInterface(breedingAddress);
