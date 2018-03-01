@@ -1920,6 +1920,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
 
     //TODO ??? require unicorns[_unicornId].gen != 0
     function setGen(uint _unicornId, bytes _gen) onlyBlackBox public {
+        require(unicorns[_unicornId].gen.length == 1);
         unicorns[_unicornId].gen = _gen;
         UnicornGeneSet(_unicornId);
     }
