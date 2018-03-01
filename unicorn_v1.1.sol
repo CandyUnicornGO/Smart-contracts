@@ -1615,6 +1615,9 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
         uint64 birthTime;
         uint64 freezingEndTime;
         uint64 freezingTourEndTime;
+        uint breed;
+        uint asSire;
+        uint asMate;
         string name;
     }
 
@@ -1855,6 +1858,9 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
             birthTime : uint64(now),
             freezingEndTime : 0,
             freezingTourEndTime: 0,
+            breed: 0,
+            asSire: 0,
+            asMate: 0,
             name: ''
             });
         Transfer(0x0, _owner, _unicornId);
@@ -1926,6 +1932,21 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
 
     function getGen(uint _unicornId) external view returns (bytes){
         return unicorns[_unicornId].gen;
+    }
+
+
+    function countBreedeeng(uint childId, uint sireId, uint mateId) internal {
+        unicorns[sireId].asSire = unicorns[sireId].asSire.add(1);
+        unicorns[mateId].asMate = unicorns[mateId].asMate.add(1);
+        unicorns[childId].breed = min(unicorns[sireId].breed, unicorns[mateId].breed);
+    }
+
+//    function max(uint a, uint b) private pure returns (uint) {
+//        return a > b ? a : b;
+//    }
+
+    function min(uint a, uint b) private pure returns (uint) {
+        return a < b ? a : b;
     }
 }
 
@@ -2035,6 +2056,7 @@ contract UnicornBreeding is UnicornBase {
         setFreezing(_unicornId);
 
         uint256 childUnicornId  = _createUnicorn(msg.sender);
+        countBreedeeng(childUnicornId, h.unicorn_id, h.second_unicorn_id);
 
         CreateUnicorn(msg.sender, childUnicornId, h.unicorn_id, h.second_unicorn_id);
 
