@@ -1013,8 +1013,6 @@ contract usingOraclize {
 
 }
 
-pragma solidity ^0.4.17;
-
 
 library SafeMath {
     function mul(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -1064,7 +1062,6 @@ contract UnicornManagement {
     uint public createUnicornPrice = 50000000000000000;
     uint public createUnicornPriceInCandy = 25000000000000000000; //25 tokens
     uint public oraclizeFee = 3000000000000000; //0.003 ETH
-
 
     bool public paused = true;
 
@@ -1271,8 +1268,8 @@ contract UnicornManagementInterface {
 
     function createDividendPercent() external view returns (uint); //OnlyManager 4 digits. 10.5% = 1050
     function sellDividendPercent() external view returns (uint); //OnlyManager 4 digits. 10.5% = 1050
-    function subFreezingPrice() external returns (uint); // 0.01 ETH
-    function subFreezingTime() external  viewview returns (uint64);
+    function subFreezingPrice() external view returns (uint); // 0.01 ETH
+    function subFreezingTime() external view returns (uint64);
     function createUnicornPrice() external view returns (uint);
     function createUnicornPriceInCandy() external view returns (uint); //1 token
     function oraclizeFee() external view returns (uint); //0.003 ETH
@@ -1294,7 +1291,7 @@ contract UnicornManagementInterface {
     function setCreateUnicornFullPrice(uint _price, uint _candyPrice) external;
     function getCreateUnicornFullPrice() external view returns (uint);
     function getHybridizationFullPrice(uint _price) external view returns (uint);
-    function getSellUnicornPrice(uint _price) external view returns (uint);
+    function getSellUnicornFullPrice(uint _price) external view returns (uint);
     function getCreateUnicornFullPriceInCandy() external view returns (uint);
     function pause() public;
     function unpause() public;
@@ -1425,7 +1422,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     // queue_index => unicornId
     mapping(uint => uint) public queue;
     uint public queueSize = 0;
-    uint gasLimit = 250000;
+    uint gasLimit = 400000;
 
     string genCoreUrl = "BAdL0Wo6ujCMz/QLJL5daj57R00OusTUuymK+XEVmGI8BgjdpUbTYZCLBv0D524Oe9306mZJO6VOMBGjgrni8uGfa6X+Ckc3bsJghmv3ae5vlIpB6Gj0WoljUv0n8wZHENG+zWZsrzNPwc60SVHmmGCgH4fqmtMYPSjIJDMzQhZ2JpG43qrceNyghrB9cMUCvatwOdDUhOou5WvhGGboNvY1HIqtgoenv4FtyUCANt7VLwHkGg==";
     string gen0Url = "BDymKBpAwjmJ4wwB1OGkJQnn3puTj6dEYUYJ6Ej1yzl6Wh16elvSBKA29Ml23BBKFowk6jfFsR2YWqhdH9kiusY/RZqsdNDH/NstdjKhx36qvmy47q184mzdQaClLbde9LNEw+TC5ya19SVpLj9EBoyEvUf7JIBAbM5mm+gn2iUi/MMCMW3S3hGTSNeH6yPtEFXAni8nIcx5g5YXp3Hw6jstA1IVaHiw2xuY1WiSZJA1fnahBl9mZ6o=";
@@ -1437,12 +1434,12 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     string genCoreQuery1 = '\n{"parents": [{"unicorn_blockchain_id":';
 
     event LogNewOraclizeQuery(string description);
-    event Gene0Request(uint indexed unicornId, uint unicornType);
+    event Gene0Request(uint indexed unicornId, uint8 unicornType);
     event GeneHybritizationRequest(uint indexed unicornId, uint firstAncestorUnicornId, uint secondAncestorUnicornId);
 
     event Gene0RequestRetry(uint indexed unicornId);
     event GeneHybritizationRequestRetry(uint indexed unicornId);
-
+    event FundsTransferred(address dividendManager, uint value);
 
 
 
@@ -1501,7 +1498,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     }
 
     //TODO gas limit eth_gasPrice
-    function createGen0(uint _unicornId, uint _type) onlyBreeding public payable {
+    function createGen0(uint _unicornId, uint8 _type) onlyBreeding public payable {
         if (oraclize_getPrice("URL") > this.balance) {
             revert();
         } else {
@@ -1539,10 +1536,10 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
         gen0Url = _gen0Url;
     }
 
-    function transferEthersToDividendManager(uint _valueInFinney) onlyOwner public    {
-        require(this.balance >= _valueInFinney * 1 finney);
-        unicornManagement.dividendManagerAddress().transfer(_valueInFinney);
-        //FundsTransferred(dividendManagerAddress, _valueInFinney * 1 finney);
+    function transferEthersToDividendManager(uint _value) onlyManager public {
+        require(this.balance >= _value);
+        unicornManagement.dividendManagerAddress().transfer(_value);
+        FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
     }
 
 
@@ -1622,6 +1619,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
     }
 
 
+    uint8 maxFreezingIndex = 7;
     uint32[8] public freezing = [
     uint32(1 hours),    //1 hour
     uint32(2 hours),    //2 - 4 hours
@@ -1912,7 +1910,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
     }
 
     function _getFreezeTime(uint8 freezingIndex) internal view returns (uint time) {
-        freezingIndex %= 7;
+        freezingIndex %= maxFreezingIndex;
         time = freezing[freezingIndex];
         if (freezingPlusCount[freezingIndex] != 0) {
             time += (uint(block.blockhash(block.number - 1)) % freezingPlusCount[freezingIndex]) * 1 hours;
@@ -1956,7 +1954,7 @@ contract UnicornBreeding is UnicornBase {
     uint public gen0Count = 0;
     uint public gen0Step = 1000;
 
-    uint internal maxType = 2;
+    uint8 internal maxType = 2;
     //limits for presale
     uint32[3] public typeLimits = [
         150, 40, 10
@@ -2110,7 +2108,7 @@ contract UnicornBreeding is UnicornBase {
 
 
     //Create new 0 gen
-    function createPresaleUnicorn(address _owner, uint _type) public payable onlyManager whenNotPaused returns(uint256)   {
+    function createPresaleUnicorn(address _owner, uint8 _type) public payable onlyManager whenNotPaused returns(uint256)   {
         _type %= maxType;
         require(typeCounter[_type] <= typeLimits[_type]);
         require(msg.value == unicornManagement.oraclizeFee());
@@ -2162,7 +2160,7 @@ contract UnicornBreeding is UnicornBase {
         candyToken.transfer(_to,_value);
     }
 
-    function transferEthersToDividendManager(uint _value) onlyManager public    {
+    function transferEthersToDividendManager(uint _value) onlyManager public {
         require(this.balance >= _value);
         unicornManagement.dividendManagerAddress().transfer(_value);
         FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
