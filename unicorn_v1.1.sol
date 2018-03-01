@@ -1261,23 +1261,23 @@ contract UnicornManagement {
 
 contract UnicornManagementInterface {
 
-    function ownerAddress() public returns (address);
-    function managerAddress() public returns (address);
-    function communityAddress() public returns (address);
-    function dividendManagerAddress() public returns (address);
-    //    function blackBoxAddress() public returns (address);
-    //    function breedingAddress() public returns (address);
-    function candyToken() public returns (address);
+    function ownerAddress() external view returns (address);
+    function managerAddress() external view returns (address);
+    function communityAddress() external view returns (address);
+    function dividendManagerAddress() external view returns (address);
+    //    function blackBoxAddress() external view returns (address);
+    //    function breedingAddress() external view returns (address);
+    function candyToken() external view returns (address);
 
-    function createDividendPercent() public returns (uint); //OnlyManager 4 digits. 10.5% = 1050
-    function sellDividendPercent() public returns (uint); //OnlyManager 4 digits. 10.5% = 1050
-    function subFreezingPrice() public returns (uint); // 0.01 ETH
-    function subFreezingTime() public returns (uint64);
-    function createUnicornPrice() public returns (uint);
-    function createUnicornPriceInCandy() public returns (uint); //1 token
-    function oraclizeFee() public returns (uint); //0.003 ETH
+    function createDividendPercent() external view returns (uint); //OnlyManager 4 digits. 10.5% = 1050
+    function sellDividendPercent() external view returns (uint); //OnlyManager 4 digits. 10.5% = 1050
+    function subFreezingPrice() external returns (uint); // 0.01 ETH
+    function subFreezingTime() external  viewview returns (uint64);
+    function createUnicornPrice() external view returns (uint);
+    function createUnicornPriceInCandy() external view returns (uint); //1 token
+    function oraclizeFee() external view returns (uint); //0.003 ETH
 
-    function paused() public returns (bool);
+    function paused() external view returns (bool);
 
     //    function transferOwnership(address _ownerAddress) external;
     //    function setTournament(address _tournamentAddress) external;
@@ -1595,7 +1595,7 @@ contract UnicornBreedingAccessControl is UnicornAccessControl {
         return unicornManagement.paused();
     }
 
-    function setBlackBoxAddress(address _blackBoxAddress) external onlyOwner whenPaused    {
+    function setBlackBox(address _blackBoxAddress) external onlyOwner whenPaused    {
         require(_blackBoxAddress != address(0));
         blackBoxContract = BlackBoxInterface(_blackBoxAddress);
         blackBoxAddress = _blackBoxAddress;
@@ -1618,7 +1618,6 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
         uint64 birthTime;
         uint64 freezingEndTime;
         uint64 freezingTourEndTime;
-
         string name;
     }
 
@@ -1883,10 +1882,13 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
     }
 
 
-    function getUnicornGenByte(uint _unicornId, uint _byteNo) public view returns (uint8 _byte) {
+    function getUnicornGenByte(uint _unicornId, uint _byteNo) public view returns (uint8) {
         uint n = _byteNo << 1; // = _byteNo * 2
-        require(unicorns[_unicornId].gen.length >= n + 1);
-        _byte = fromHexChar(uint8(unicorns[_unicornId].gen[n])) << 4 | fromHexChar(uint8(unicorns[_unicornId].gen[n + 1]));
+//        require(unicorns[_unicornId].gen.length >= n + 1);
+        if (unicorns[_unicornId].gen.length < n + 1) {
+            return 0;
+        }
+        return fromHexChar(uint8(unicorns[_unicornId].gen[n])) << 4 | fromHexChar(uint8(unicorns[_unicornId].gen[n + 1]));
     }
 
 
@@ -1950,10 +1952,11 @@ contract UnicornBreeding is UnicornBase {
     //    uint public createUnicornPriceInCandy; //OnlyManager price in CandyCoin
 
     //counter for gen0
-    uint public gen0limit = 30000;
+    uint public gen0Limit = 30000;
     uint public gen0Count = 0;
-    uint public gen0step = 1000;
+    uint public gen0Step = 1000;
 
+    uint internal maxType = 2;
     //limits for presale
     uint32[3] public typeLimits = [
         150, 40, 10
@@ -2021,13 +2024,12 @@ contract UnicornBreeding is UnicornBase {
     }
 
 
-    function acceptHybridization(uint _hybridizationId, uint _unicornId) onlyOwnerOf(_unicornId) public payable whenNotPaused   {
+    function acceptHybridization(uint _hybridizationId, uint _unicornId) onlyOwnerOf(_unicornId) whenNotPaused public payable    {
         Hybridization storage h = hybridizations[_hybridizationId];
         require(h.exists && !h.accepted);
         require(_unicornId != h.unicorn_id);
-
-        require(msg.value == getHybridizationPrice(_hybridizationId));
         require(isReadyForHybridization(_unicornId) && isReadyForHybridization(h.unicorn_id));
+        require(msg.value == getHybridizationPrice(_hybridizationId));
 
         h.second_unicorn_id = _unicornId;
         // !!!
@@ -2075,7 +2077,7 @@ contract UnicornBreeding is UnicornBase {
 
     //Create new 0 gen
     function createUnicorn() public payable whenNotPaused returns(uint256)   {
-        require(gen0Count < gen0limit);
+        require(gen0Count < gen0Limit);
         require(msg.value == getCreateUnicornPrice());
 
         uint256 newUnicornId = _createUnicorn(msg.sender);
@@ -2090,7 +2092,7 @@ contract UnicornBreeding is UnicornBase {
 
 
     function createUnicornForCandy() public whenNotPaused returns(uint256)   {
-        require(gen0Count < gen0limit);
+        require(gen0Count < gen0Limit);
         //without oraclize fee
         //allowance проверяется в transferFrom
         //        require(candyToken.allowance(msg.sender, this) >= createUnicornPriceInCandy);
@@ -2109,6 +2111,7 @@ contract UnicornBreeding is UnicornBase {
 
     //Create new 0 gen
     function createPresaleUnicorn(address _owner, uint _type) public payable onlyManager whenNotPaused returns(uint256)   {
+        _type %= maxType;
         require(typeCounter[_type] <= typeLimits[_type]);
         require(msg.value == unicornManagement.oraclizeFee());
 
@@ -2159,23 +2162,22 @@ contract UnicornBreeding is UnicornBase {
         candyToken.transfer(_to,_value);
     }
 
-    function transferEthersToDividendManager(uint _valueInFinney) onlyManager public    {
-        require(this.balance >= _valueInFinney * 1 finney);
-        //require(this.balance.sub(oraclizeFeeAmount) >= _valueInFinney * 1 finney);
-        unicornManagement.dividendManagerAddress().transfer(_valueInFinney);
-        FundsTransferred(unicornManagement.dividendManagerAddress(), _valueInFinney * 1 finney);
+    function transferEthersToDividendManager(uint _value) onlyManager public    {
+        require(this.balance >= _value);
+        unicornManagement.dividendManagerAddress().transfer(_value);
+        FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
     }
 
 
     function setGen0Limit() external onlyCommunity {
-        require(gen0Count == gen0limit);
-        gen0limit = gen0limit.add(gen0step);
-        NewGen0Limit(gen0limit);
+        require(gen0Count == gen0Limit);
+        gen0Limit = gen0Limit.add(gen0Step);
+        NewGen0Limit(gen0Limit);
     }
 
     function setGen0Step(uint _step) external onlyCommunity {
-        gen0step = _step;
-        NewGen0Step(gen0limit);
+        gen0Step = _step;
+        NewGen0Step(gen0Limit);
     }
 
 }
@@ -2244,13 +2246,14 @@ contract Crowdsale is UnicornAccessControl {
     }
 
     function getPrice(uint unicornId) public view returns (uint) {
-        return unicornManagement.getSellUnicornPrice(prices[unicornId]);
+        return unicornManagement.getSellUnicornFullPrice(prices[unicornId]);
     }
 
-    function transferEthersToDividendManager(uint _valueInFinney) onlyManager public    {
-        require(this.balance >= _valueInFinney * 1 finney);
-        unicornManagement.dividendManagerAddress().transfer(_valueInFinney);
-        FundsTransferred(unicornManagement.dividendManagerAddress(), _valueInFinney * 1 finney);
+
+    function transferEthersToDividendManager(uint _value) onlyManager public    {
+        require(this.balance >= _value);
+        unicornManagement.dividendManagerAddress().transfer(_value);
+        FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
     }
 
 }
