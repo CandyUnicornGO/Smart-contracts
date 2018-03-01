@@ -1403,7 +1403,7 @@ contract BlackBoxAccessControl is UnicornAccessControl {
         _;
     }
 
-    function setBreeding(address _breedingAddress) external onlyOwner {
+    function setBreeding(address _breedingAddress) onlyOwner whenNotPaused external {
         require(_breedingAddress != address(0));
         breedingAddress = _breedingAddress;
         breedingContract = UnicornBreedingInterface(breedingAddress);
@@ -1434,7 +1434,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     string genCoreQuery1 = '\n{"parents": [{"unicorn_blockchain_id":';
 
     event LogNewOraclizeQuery(string description);
-    event Gene0Request(uint indexed unicornId, uint8 unicornType);
+    event Gene0Request(uint indexed unicornId, uint unicornType);
     event GeneHybritizationRequest(uint indexed unicornId, uint firstAncestorUnicornId, uint secondAncestorUnicornId);
 
     event Gene0RequestRetry(uint indexed unicornId);
@@ -1498,7 +1498,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     }
 
     //TODO gas limit eth_gasPrice
-    function createGen0(uint _unicornId, uint8 _type) onlyBreeding public payable {
+    function createGen0(uint _unicornId, uint _type) onlyBreeding public payable {
         if (oraclize_getPrice("URL") > this.balance) {
             revert();
         } else {
@@ -1954,7 +1954,7 @@ contract UnicornBreeding is UnicornBase {
     uint public gen0Count = 0;
     uint public gen0Step = 1000;
 
-    uint8 internal maxType = 2;
+    uint internal maxType = 2;
     //limits for presale
     uint32[3] public typeLimits = [
         150, 40, 10
@@ -2108,7 +2108,7 @@ contract UnicornBreeding is UnicornBase {
 
 
     //Create new 0 gen
-    function createPresaleUnicorn(address _owner, uint8 _type) public payable onlyManager whenNotPaused returns(uint256)   {
+    function createPresaleUnicorn(address _owner, uint _type) public payable onlyManager whenNotPaused returns(uint256)   {
         _type %= maxType;
         require(typeCounter[_type] <= typeLimits[_type]);
         require(msg.value == unicornManagement.oraclizeFee());
