@@ -73,7 +73,7 @@ contract DividendManager {
     event WithdrawalPayed(address indexed holder, uint256 amount);
 
     /* Indicates a dividend payment was made. */
-    event DividendPayment(uint256 paymentPerShare, uint256 timestamp);
+    event DividendPayment(uint256 paymentPerShare);
 
     /* Create our contract with references to other contracts as required. */
     function DividendManager(address _unicornDividendToken) public{
@@ -81,46 +81,52 @@ contract DividendManager {
         unicornDividendToken = UnicornDividendTokenInterface(_unicornDividendToken);
     }
 
+    uint256 public remainder = 0;
+
+
     // Makes a dividend payment - we make it available to all senders then send the change back to the caller.  We don't actually send the payments to everyone to reduce gas cost and also to
     // prevent potentially getting into a situation where we have recipients throwing causing dividend failures and having to consolidate their dividends in a separate process.
 
     //TODO т.к. токенов всего выпущено 100 * 10**3, то при отправке на контракт Менеджера эфира менше этой суммы (в wei)
-    // сработает require (paymentPerShare > 0); и вызовется revert(), который в свою очередь отправит эфир обратно на
-    // контракт Бридинга, в котором нет fallback payable функции!
+    // сработает require (paymentPerShare > 0); и вызовется revert()
     function () public payable {
+        uint sum = remainder.add(msg.value);
+        require(sum > 0);
+
         //if (unicornDividendToken.isClosed())
 
         /* Determine how much to pay each shareholder. */
         uint256 totalSupply = unicornDividendToken.totalSupply();
-        uint256 paymentPerShare = msg.value.div(totalSupply);
-        require (paymentPerShare > 0); //!!!
-
-        /* Enum all accounts and send them payment */
-        //        uint256 totalPaidOut = 0;
-        // внимание! id холдера начинаются с 1!
-        for (uint256 i = 1; i <= unicornDividendToken.getHoldersCount(); i++) {
-            address holder = unicornDividendToken.getHolder(i);
-            uint256 withdrawal = paymentPerShare * unicornDividendToken.balanceOf(holder);
-            //TODO если владельцы токенов изменились, то в dividends могут остаться бывшие холдеры, которых не найти
-            // и на контракте останется эфир
-            pendingWithdrawals[holder] = pendingWithdrawals[holder].add(withdrawal);
-            WithdrawalAvailable(holder, withdrawal);
-            //            totalPaidOut = totalPaidOut.add(withdrawal);
+        uint256 paymentPerShare = sum.div(totalSupply);
+//        require (paymentPerShare > 0); //!!!
+        uint256 totalPaidOut = 0;
+        if (paymentPerShare > 0) {
+            /* Enum all accounts and send them payment */
+            // внимание! id холдера начинаются с 1!
+            for (uint256 i = 1; i <= unicornDividendToken.getHoldersCount(); i++) {
+                address holder = unicornDividendToken.getHolder(i);
+                uint256 withdrawal = paymentPerShare * unicornDividendToken.balanceOf(holder);
+                //TODO если владельцы токенов изменились, то в dividends могут остаться бывшие холдеры, которых не найти
+                // и на контракте останется эфир
+                pendingWithdrawals[holder] = pendingWithdrawals[holder].add(withdrawal);
+                WithdrawalAvailable(holder, withdrawal);
+                totalPaidOut = totalPaidOut.add(withdrawal);
+            }
         }
 
         // Attempt to send change
-        /*uint256 remainder = msg.value.sub(totalPaidOut);
-        if (remainder > 0 && !msg.sender.send(remainder)) {
-            dividends[msg.sender] = dividends[msg.sender].add(remainder);
-            PaymentAvailable(msg.sender, remainder);
-        }*/
+        remainder = sum.sub(totalPaidOut);
+//        if (remainder > 0 && !msg.sender.send(remainder)) {
+//            dividends[msg.sender] = dividends[msg.sender].add(remainder);
+//            PaymentAvailable(msg.sender, remainder);
+//        }*/
 
         // for Audit
-        DividendPayment(paymentPerShare, now);
+        DividendPayment(paymentPerShare);
     }
 
     /* Allows a user to request a withdrawal of their dividend in full. */
-    function withdrawDividend() public{
+    function withdrawDividend() public {
         uint amount = pendingWithdrawals[msg.sender];
         // Ensure we have dividends available
         require (amount > 0);//!!!
@@ -131,7 +137,4 @@ contract DividendManager {
         msg.sender.transfer(amount);
         WithdrawalPayed(msg.sender, amount);
     }
-
-    //TODO обсудить! т.к. мы ничего не делаем с остатком (remainder), то теоретически он может накапливаться,
-    //а могут и холдеры умереть - надо иметь возможность на черный день
 }
