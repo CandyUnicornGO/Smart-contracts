@@ -1548,7 +1548,6 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
     }
 
 
-    //TODO gas limit
     function genCoreManual(uint _unicornId) onlyOwner public {
         require(bytes(requests[_unicornId].request).length > 0);
         if (oraclize_getPrice("URL") > this.balance) {
@@ -1561,7 +1560,7 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
         }
     }
 
-    //TODO gas limit eth_gasPrice
+
     function createGen0Manual(uint _unicornId) onlyOwner public payable {
         require(bytes(requests[_unicornId].request).length > 0);
         if (oraclize_getPrice("URL") > this.balance) {
@@ -1620,7 +1619,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
 
 
     uint8 maxFreezingIndex = 7;
-    uint32[8] public freezing = [
+    uint32[8] internal freezing = [
     uint32(1 hours),    //1 hour
     uint32(2 hours),    //2 - 4 hours
     uint32(8 hours),    //8 - 12 hours
@@ -1632,7 +1631,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
     ];
 
     //count for random plus from 0 to ..
-    uint32[8] public freezingPlusCount = [
+    uint32[8] internal freezingPlusCount = [
     0, 3, 5, 9, 13, 25, 25, 0
     ];
 
