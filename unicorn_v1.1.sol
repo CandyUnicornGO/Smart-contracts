@@ -1851,7 +1851,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
         addUnicorn(_owner, _unicornId);
         //store new unicorn data
         unicorns[_unicornId] = Unicorn({
-            gen : new bytes(1),
+            gen : new bytes(0),
             birthTime : uint64(now),
             freezingEndTime : 0,
             freezingTourEndTime: 0,
@@ -1920,7 +1920,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
 
     //TODO ??? require unicorns[_unicornId].gen != 0
     function setGen(uint _unicornId, bytes _gen) onlyBlackBox public {
-        require(unicorns[_unicornId].gen.length == 1);
+        require(unicorns[_unicornId].gen.length == 0);
         unicorns[_unicornId].gen = _gen;
         UnicornGeneSet(_unicornId);
     }
