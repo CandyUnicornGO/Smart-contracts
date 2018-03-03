@@ -2293,9 +2293,9 @@ contract Crowdsale is UnicornAccessControl {
         UnicornSold(msg.sender, unicornId);
     }
 
-    //function getPrice(uint unicornId) public view returns (uint) {
-    //    return unicornManagement.getSellUnicornFullPrice(prices[unicornId]);
-    //}
+    function getPrice(uint _unicornId) public view returns (uint) {
+        return unicornManagement.getSellUnicornFullPrice(offers[_unicornId].price);
+    }
 
 
     function transferEthersToDividendManager(uint _value) onlyManager public {
