@@ -81,45 +81,37 @@ contract DividendManager {
         unicornDividendToken = UnicornDividendTokenInterface(_unicornDividendToken);
     }
 
-    uint256 public remainder = 0;
+    uint256 public retainedEarning = 0;
 
 
     // Makes a dividend payment - we make it available to all senders then send the change back to the caller.  We don't actually send the payments to everyone to reduce gas cost and also to
     // prevent potentially getting into a situation where we have recipients throwing causing dividend failures and having to consolidate their dividends in a separate process.
 
-    //TODO т.к. токенов всего выпущено 100 * 10**3, то при отправке на контракт Менеджера эфира менше этой суммы (в wei)
-    // сработает require (paymentPerShare > 0); и вызовется revert()
     function () public payable {
-        uint sum = remainder.add(msg.value);
-        require(sum > 0);
+        payDividend();
+    }
 
-        //if (unicornDividendToken.isClosed())
+    function payDividend() public payable {
+        retainedEarning = retainedEarning.add(msg.value);
+        require(retainedEarning > 0);
 
         /* Determine how much to pay each shareholder. */
         uint256 totalSupply = unicornDividendToken.totalSupply();
-        uint256 paymentPerShare = sum.div(totalSupply);
+        uint256 paymentPerShare = retainedEarning.div(totalSupply);
 //        require (paymentPerShare > 0); //!!!
-        uint256 totalPaidOut = 0;
         if (paymentPerShare > 0) {
+            uint256 totalPaidOut = 0;
             /* Enum all accounts and send them payment */
             // внимание! id холдера начинаются с 1!
             for (uint256 i = 1; i <= unicornDividendToken.getHoldersCount(); i++) {
                 address holder = unicornDividendToken.getHolder(i);
                 uint256 withdrawal = paymentPerShare * unicornDividendToken.balanceOf(holder);
-                //TODO если владельцы токенов изменились, то в dividends могут остаться бывшие холдеры, которых не найти
-                // и на контракте останется эфир
                 pendingWithdrawals[holder] = pendingWithdrawals[holder].add(withdrawal);
                 WithdrawalAvailable(holder, withdrawal);
                 totalPaidOut = totalPaidOut.add(withdrawal);
             }
+            retainedEarning = retainedEarning.sub(totalPaidOut);
         }
-
-        // Attempt to send change
-        remainder = sum.sub(totalPaidOut);
-//        if (remainder > 0 && !msg.sender.send(remainder)) {
-//            dividends[msg.sender] = dividends[msg.sender].add(remainder);
-//            PaymentAvailable(msg.sender, remainder);
-//        }*/
 
         // for Audit
         DividendPayment(paymentPerShare);

@@ -1255,6 +1255,9 @@ contract UnicornManagement {
     }
 }
 
+contract DividendManagerInterface {
+    function payDividend() external payable;
+}
 
 contract UnicornManagementInterface {
 
@@ -1538,7 +1541,8 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 
     function transferEthersToDividendManager(uint _value) onlyManager public {
         require(this.balance >= _value);
-        unicornManagement.dividendManagerAddress().transfer(_value);
+        DividendManagerInterface dividendManager = DividendManagerInterface(unicornManagement.dividendManagerAddress());
+        dividendManager.payDividend.value(_value)();
         FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
     }
 
@@ -2162,7 +2166,8 @@ contract UnicornBreeding is UnicornBase {
 
     function transferEthersToDividendManager(uint _value) onlyManager public {
         require(this.balance >= _value);
-        unicornManagement.dividendManagerAddress().transfer(_value);
+        DividendManagerInterface dividendManager = DividendManagerInterface(unicornManagement.dividendManagerAddress());
+        dividendManager.payDividend.value(_value)();
         FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
     }
 
@@ -2248,9 +2253,10 @@ contract Crowdsale is UnicornAccessControl {
     }
 
 
-    function transferEthersToDividendManager(uint _value) onlyManager public    {
+    function transferEthersToDividendManager(uint _value) onlyManager public {
         require(this.balance >= _value);
-        unicornManagement.dividendManagerAddress().transfer(_value);
+        DividendManagerInterface dividendManager = DividendManagerInterface(unicornManagement.dividendManagerAddress());
+        dividendManager.payDividend.value(_value)();
         FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
     }
 
