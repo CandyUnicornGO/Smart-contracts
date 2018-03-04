@@ -2232,11 +2232,11 @@ contract Crowdsale is UnicornAccessControl {
     mapping (uint => uint) public unicornOffer;
 
 
-    //TODO ?? список уникорнов в продаже
 
     function Crowdsale(address _unicornToken, address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
         unicornToken = ERC721(_unicornToken);
     }
+
 
     function () public payable {
 
@@ -2278,7 +2278,11 @@ contract Crowdsale is UnicornAccessControl {
         //}
 
         UnicornSold(msg.sender, unicornOffer[_unicornId], _unicornId);
+
+        delete offers[unicornOffer[_unicornId]];
+        delete unicornOffer[_unicornId];
     }
+
 
     function revokeUnicorn(uint _unicornId) public {
         require(unicornToken.owns(msg.sender, _unicornId));
