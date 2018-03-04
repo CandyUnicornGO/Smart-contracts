@@ -2210,9 +2210,9 @@ contract UnicornBreeding is UnicornBase {
 contract Crowdsale is UnicornAccessControl {
     using SafeMath for uint;
 
-    event NewOffer(address indexed beneficiary, uint256 unicornId, uint price);
-    event OfferCancel(address indexed beneficiary, uint256 unicornId);
-    event UnicornSold(address indexed newOwner, uint256 unicornId);
+    event NewOffer(address indexed beneficiary, uint256 indexed offerId, uint256 indexed unicornId, uint price);
+    event OfferCancel(address indexed beneficiary, uint256 indexed offerId, uint256 indexed unicornId);
+    event UnicornSold(address indexed newOwner, uint256 indexed offerId, uint256 indexed unicornId);
     event FundsTransferred(address dividendManager, uint value);
 
     ERC721 public unicornToken;
@@ -2229,14 +2229,17 @@ contract Crowdsale is UnicornAccessControl {
     // Mapping from offer ID to Offer struct
     mapping (uint => Offer) public offers;
     // Mapping from unicorn ID to offer ID
-    mapping (uint => uint) private unicornOffer;
+    mapping (uint => uint) public unicornOffer;
 
 
     //TODO ?? список уникорнов в продаже
-    mapping (uint256 => uint256) public prices; // if prices[id] = 0 then not for sale
 
-    function Crowdsale(address _token, address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        unicornToken = ERC721(_token);
+    function Crowdsale(address _unicornToken, address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
+        unicornToken = ERC721(_unicornToken);
+    }
+
+    function () public payable {
+
     }
 
 
@@ -2254,47 +2257,43 @@ contract Crowdsale is UnicornAccessControl {
 
         unicornOffer[_unicornId] = _offerId;
 
-        NewOffer(msg.sender, _unicornId, _price);
-    }
-
-
-    function revokeUnicorn(uint _unicornId) public {
-        require(unicornToken.owns(msg.sender, unicornId));
-        require(unicornToken.allowance(this,unicornId));
-        require(offers[unicornOffer[_unicornId]].exists && !offers[unicornOffer[_unicornId]].accepted);
-
-        delete offers[unicornOffer[_unicornId]];
-        delete unicornOffer[_unicornId];
-
-        OfferCancel(msg.sender, _unicornId);
-    }
-
-
-    function () public payable {
-
+        NewOffer(msg.sender, _offerId, _unicornId, _price);
     }
 
 
     function buyUnicorn(uint _unicornId) public payable {
         //require(msg.value >= getPrice(unicornId));
-        Offer storage o = offers[_unicornId];
+        Offer storage o = offers[unicornOffer[_unicornId]];
         require(msg.value == unicornManagement.getSellUnicornFullPrice(o.price));
         require(o.exists && !o.accepted);
 
+        o.accepted = true;
         //uint diff = msg.value - getPrice(unicornId);
-        address owner = unicornToken.ownerOf(unicornId);
+        address owner = unicornToken.ownerOf(_unicornId);
 
-        unicornToken.transferFrom(owner, msg.sender, unicornId);
+        unicornToken.transferFrom(owner, msg.sender, _unicornId);
         owner.transfer(o.price);
         //if (diff > 0) {
         //    msg.sender.transfer(diff);  // give change
         //}
 
-        UnicornSold(msg.sender, unicornId);
+        UnicornSold(msg.sender, unicornOffer[_unicornId], _unicornId);
     }
 
+    function revokeUnicorn(uint _unicornId) public {
+        require(unicornToken.owns(msg.sender, _unicornId));
+        require(unicornToken.allowance(this, _unicornId));
+        require(offers[unicornOffer[_unicornId]].exists && !offers[unicornOffer[_unicornId]].accepted);
+
+        OfferCancel(msg.sender, unicornOffer[_unicornId], _unicornId);
+
+        delete offers[unicornOffer[_unicornId]];
+        delete unicornOffer[_unicornId];
+    }
+
+
     function getPrice(uint _unicornId) public view returns (uint) {
-        return unicornManagement.getSellUnicornFullPrice(offers[_unicornId].price);
+        return unicornManagement.getSellUnicornFullPrice(offers[unicornOffer[_unicornId]].price);
     }
 
 
