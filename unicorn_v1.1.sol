@@ -1069,7 +1069,7 @@ contract UnicornManagement {
 
     bool public paused = true;
 
-    mapping(address => bool) tournaments;//address 1 exists
+    mapping(address => bool) tournaments;//address
 
     event GamePaused();
     event GameResumed();
@@ -1613,11 +1613,18 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 
 contract UnicornBreedingAccessControl is UnicornAccessControl {
     address public blackBoxAddress; //onlyOwner
+    address public geneLabAddress; //onlyOwner
     BlackBoxInterface internal blackBoxContract; //onlyOwner
-    mapping(address => bool) tournaments;//address 1 exists
+    //mapping(address => bool) tournaments;//
+
 
     modifier onlyBlackBox() {
         require(msg.sender == blackBoxAddress);
+        _;
+    }
+
+    modifier onlyGeneLab() {
+        require(msg.sender == geneLabAddress);
         _;
     }
 
@@ -1630,6 +1637,12 @@ contract UnicornBreedingAccessControl is UnicornAccessControl {
         blackBoxContract = BlackBoxInterface(_blackBoxAddress);
         blackBoxAddress = _blackBoxAddress;
     }
+
+    //TODO Pause for dependences functions
+    function setGeneLab(address _geneLabAddress) external onlyOwner  {
+        require(_geneLabAddress != address(0));
+        geneLabAddress = _geneLabAddress;
+    }
 }
 
 contract UnicornBase is ERC721, UnicornBreedingAccessControl {
@@ -1640,6 +1653,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
     string public constant symbol = "UNG";
 
     event UnicornGeneSet(uint indexed unicornId);
+    event UnicornGeneUpdate(uint indexed unicornId);
     event UnicornFreezingTimeSet(uint indexed unicornId, uint time);
     event UnicornTourFreezingTimeSet(uint indexed unicornId, uint time);
 
@@ -1687,6 +1701,8 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
     // Mapping from unicorn ID to index of the owner unicorns list
     // т.е. ID уникорна => порядковый номер в списке владельца
     mapping(uint256 => uint256) private ownedUnicornsIndex;
+
+    mapping(uint256 => bool) private unicornApprovalsForGeneLab;
 
     modifier onlyOwnerOf(uint256 _unicornId) {
         require(owns(msg.sender, _unicornId));
@@ -1960,6 +1976,25 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
     function getGen(uint _unicornId) external view returns (bytes){
         return unicorns[_unicornId].gen;
     }
+
+
+    function approveForGeneLab(uint256 _unicornId) public onlyOwnerOf(_unicornId) {
+        unicornApprovalsForGeneLab[_unicornId] = true;
+    }
+
+
+    function clearApprovalForGeneLab(uint256 _unicornId) public onlyOwnerOf(_unicornId) {
+        delete unicornApprovalsForGeneLab[_unicornId];
+    }
+
+
+    function updateGen(uint _unicornId, bytes _gen) onlyGeneLab public {
+        require(unicornApprovalsForGeneLab[_unicornId]);
+        unicorns[_unicornId].gen = _gen;
+        delete unicornApprovalsForGeneLab[_unicornId];
+        UnicornGeneUpdate(_unicornId);
+    }
+
 }
 
 
@@ -2056,7 +2091,7 @@ contract UnicornBreeding is UnicornBase {
         require(h.exists && !h.accepted);
         require(_unicornId != h.unicorn_id);
         require(isReadyForHybridization(_unicornId) && isReadyForHybridization(h.unicorn_id));
-        //TODO oraclizFee
+
         require(msg.value == unicornManagement.oraclizeFee());
         require(candyToken.transferFrom(msg.sender, this, getHybridizationPrice(_hybridizationId)));
 
@@ -2125,7 +2160,7 @@ contract UnicornBreeding is UnicornBase {
 
     function createUnicornForCandy() public payable whenNotPaused returns(uint256)   {
         require(gen0Count < gen0Limit);
-        //TODO ?? oraclizeFee
+
         require(msg.value == unicornManagement.oraclizeFee());
         require(candyToken.transferFrom(msg.sender, this, getCreateUnicornPriceInCandy()));
 
@@ -2282,7 +2317,7 @@ contract Crowdsale is UnicornAccessControl {
 
     function sellUnicorn(uint _unicornId, uint _price) public {
         require(unicornToken.owns(msg.sender, _unicornId));
-        require(unicornToken.allowance(this,_unicornId));
+        //require(unicornToken.allowance(this,_unicornId));
         require(!offers[unicornOffer[_unicornId]].exists);
 
         uint256 _offerId = ++lastOfferId;
