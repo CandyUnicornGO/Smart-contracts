@@ -1050,6 +1050,7 @@ contract UnicornManagement {
     address public ownerAddress;
     address public managerAddress;
     address public communityAddress;
+    address public walletAddress;
     address public candyToken;
     address public candyPowerToken;
     address public dividendManagerAddress; //onlyCommunity
@@ -1060,6 +1061,8 @@ contract UnicornManagement {
     uint public sellDividendPercent = 375; //OnlyManager 4 digits. 10.5% = 1050
     uint public subFreezingPrice = 1000000000000000000; //
     uint64 public subFreezingTime = 1 hours;
+    uint public subTourFreezingPrice = 1000000000000000000; //
+    uint64 public subTourFreezingTime = 1 hours;
     uint public createUnicornPrice = 50000000000000000;
     uint public createUnicornPriceInCandy = 25000000000000000000; //25 tokens
     uint public oraclizeFee = 3000000000000000; //0.003 ETH
@@ -1074,10 +1077,13 @@ contract UnicornManagement {
     event NewManagerAddress(address managerAddress);
     event NewCommunityAddress(address communityAddress);
     event NewDividendManagerAddress(address dividendManagerAddress);
+    event NewWalletAddress(address walletAddress);
     event NewCreateUnicornPrice(uint price, uint priceCandy);
     event NewOraclizeFee(uint fee);
     event NewSubFreezingPrice(uint price);
     event NewSubFreezingTime(uint time);
+    event NewSubTourFreezingPrice(uint price);
+    event NewSubTourFreezingTime(uint time);
     event NewCreateUnicornPrice(uint price);
     event NewCreateDividendPercent(uint percent);
     event NewSellDividendPercent(uint percent);
@@ -1116,6 +1122,7 @@ contract UnicornManagement {
         ownerAddress = msg.sender;
         managerAddress = msg.sender;
         communityAddress = msg.sender;
+        walletAddress = msg.sender;
         candyToken = _candyToken;
         candyPowerToken = _candyPowerToken;
     }
@@ -1131,6 +1138,12 @@ contract UnicornManagement {
         require(_dividendManagerAddress != address(0));
         dividendManagerAddress = _dividendManagerAddress;
         NewDividendManagerAddress(_dividendManagerAddress);
+    }
+
+    function setWallet(address _walletAddress) external onlyOwner {
+        require(_walletAddress != address(0));
+        walletAddress = _walletAddress;
+        NewWalletAddress(_walletAddress);
     }
 
     function setTournament(address _tournamentAddress) external onlyOwner {
@@ -1172,6 +1185,25 @@ contract UnicornManagement {
         NewSubFreezingTime(_time);
     }
 
+    //price in CandyCoins
+    function setSubFreezingPrice(uint _price) external onlyManager {
+        subFreezingPrice = _price;
+        NewSubFreezingPrice(_price);
+    }
+
+
+    //time in minutes
+    function setSubTourFreezingTime(uint64 _time) external onlyManager {
+        subTourFreezingTime = _time * 1 minutes;
+        NewSubTourFreezingTime(_time);
+    }
+
+    //price in CandyCoins
+    function setSubTourFreezingPrice(uint _price) external onlyManager {
+        subTourFreezingPrice = _price;
+        NewSubTourFreezingPrice(_price);
+    }
+
     //in weis
     function setOraclizeFee(uint _fee) external onlyManager {
         oraclizeFee = _fee;
@@ -1184,14 +1216,6 @@ contract UnicornManagement {
         createUnicornPriceInCandy = _candyPrice;
         NewCreateUnicornPrice(_price, _candyPrice);
     }
-
-    //price in CandyCoins
-    function setSubFreezingPrice(uint _price) external onlyManager {
-        subFreezingPrice = _price;
-        NewSubFreezingPrice(_price);
-    }
-
-
 
     function setCommunity(address _communityAddress) external onlyCommunity {
         require(_communityAddress != address(0));
@@ -1267,18 +1291,21 @@ contract UnicornManagementInterface {
     function managerAddress() external view returns (address);
     function communityAddress() external view returns (address);
     function dividendManagerAddress() external view returns (address);
+    function walletAddress() external view returns (address);
     //    function blackBoxAddress() external view returns (address);
     //    function breedingAddress() external view returns (address);
     function candyToken() external view returns (address);
     function candyPowerToken() external view returns (address);
 
-    function createDividendPercent() external view returns (uint); //OnlyManager 4 digits. 10.5% = 1050
-    function sellDividendPercent() external view returns (uint); //OnlyManager 4 digits. 10.5% = 1050
-    function subFreezingPrice() external view returns (uint); // 0.01 ETH
+    function createDividendPercent() external view returns (uint);
+    function sellDividendPercent() external view returns (uint);
+    function subFreezingPrice() external view returns (uint);
     function subFreezingTime() external view returns (uint64);
+    function subTourFreezingPrice() external view returns (uint);
+    function subTourFreezingTime() external view returns (uint64);
     function createUnicornPrice() external view returns (uint);
-    function createUnicornPriceInCandy() external view returns (uint); //1 token
-    function oraclizeFee() external view returns (uint); //0.003 ETH
+    function createUnicornPriceInCandy() external view returns (uint);
+    function oraclizeFee() external view returns (uint);
 
     function paused() external view returns (bool);
 
@@ -1294,7 +1321,7 @@ contract UnicornManagementInterface {
     //    function setOraclizeFee(uint _fee) external;
     //    function setSubFreezingPrice(uint _price) external;
     //    function setSubFreezingTime(uint _time) external;
-    function setCreateUnicornFullPrice(uint _price, uint _candyPrice) external;
+//    function setCreateUnicornFullPrice(uint _price, uint _candyPrice) external;
     function getCreateUnicornFullPrice() external view returns (uint);
     function getHybridizationFullPrice(uint _price) external view returns (uint);
     function getSellUnicornFullPrice(uint _price) external view returns (uint);
@@ -1359,17 +1386,7 @@ contract UnicornAccessControl {
 }
 
 
-contract CandyCoinInterface {
-    uint256 public totalSupply;
-    function balanceOf(address who) public view returns (uint256);
-    function transfer(address to, uint256 value) public returns (bool);
-    function allowance(address owner, address spender) public view returns (uint256);
-    function transferFrom(address from, address to, uint256 value) public returns (bool);
-    function approve(address spender, uint256 value) public returns (bool);
-}
-
-
-contract CandyPowerInterface {
+contract ERC20 {
     uint256 public totalSupply;
     function balanceOf(address who) public view returns (uint256);
     function transfer(address to, uint256 value) public returns (bool);
@@ -1957,14 +1974,8 @@ contract UnicornBreeding is UnicornBase {
     event NewGen0Limit(uint limit);
     event NewGen0Step(uint step);
 
-    CandyCoinInterface public candyToken; //SET on deploy
-    CandyPowerInterface public candyPowerToken; //SET on deploy
-
-    //    uint public subFreezingPrice; //onlyCommunity price in CandyCoins
-    //    uint64 public subFreezingTime; //onlyCommunity
-    //    uint public dividendPercent; //OnlyManager 4 digits. 10.5% = 1050
-    //    uint public createUnicornPrice; //OnlyManager price in weis
-    //    uint public createUnicornPriceInCandy; //OnlyManager price in CandyCoin
+    ERC20 public candyToken; //SET on deploy
+    ERC20 public candyPowerToken; //SET on deploy
 
     //counter for gen0
     uint public gen0Limit = 30000;
@@ -2006,8 +2017,8 @@ contract UnicornBreeding is UnicornBase {
 
 
     function UnicornBreeding(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        candyToken = CandyCoinInterface(unicornManagement.candyToken());
-        candyPowerToken = CandyPowerInterface(unicornManagement.candyPowerToken());
+        candyToken = ERC20(unicornManagement.candyToken());
+        candyPowerToken = ERC20(unicornManagement.candyPowerToken());
         //        lastHybridizationId = 0;
         //        subFreezingPrice = 1000000000000000000;
         //        subFreezingTime = 5 minutes;
@@ -2112,7 +2123,7 @@ contract UnicornBreeding is UnicornBase {
     }
 
 
-    function createUnicornForCandy() public whenNotPaused returns(uint256)   {
+    function createUnicornForCandy() public payable whenNotPaused returns(uint256)   {
         require(gen0Count < gen0Limit);
         //TODO ?? oraclizeFee
         require(msg.value == unicornManagement.oraclizeFee());
@@ -2158,9 +2169,20 @@ contract UnicornBreeding is UnicornBase {
 
     //change freezing time for candy
     function minusFreezingTime(uint _unicornId) public {
+        //не минусуем на уже размороженных конях
+        require(unicorns[_unicornId].freezingEndTime > now);
         require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subFreezingPrice()));
-        Unicorn storage unicorn = unicorns[_unicornId];
-        unicorn.freezingEndTime = unicorn.freezingEndTime < unicornManagement.subFreezingTime() ? 0 : unicorn.freezingEndTime - unicornManagement.subFreezingTime();
+        //не используем safeMath, т.к. subFreezingTime в теории не должен быть больше now %)
+        unicorns[_unicornId].freezingEndTime -= unicornManagement.subFreezingTime();
+    }
+
+    //change tour freezing time for candy
+    function minusTourFreezingTime(uint _unicornId) public {
+        //не минусуем на уже размороженных конях
+        require(unicorns[_unicornId].freezingTourEndTime > now);
+        require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subTourFreezingPrice()));
+        //не используем safeMath, т.к. subTourFreezingTime в теории не должен быть больше now %)
+        unicorns[_unicornId].freezingTourEndTime -= unicornManagement.subTourFreezingTime();
     }
 
 
@@ -2169,6 +2191,9 @@ contract UnicornBreeding is UnicornBase {
         return unicornManagement.getHybridizationFullPrice(h.price);
     }
 
+    function getEtherFeeForPriceInCandy() public view returns (uint) {
+        return unicornManagement.oraclizeFee();
+    }
 
     function getCreateUnicornPriceInCandy() public view returns (uint) {
         return unicornManagement.getCreateUnicornFullPriceInCandy();
@@ -2180,10 +2205,18 @@ contract UnicornBreeding is UnicornBase {
     }
 
 
-    //TODO
-    function withdrawTokens(address _to, uint _value) onlyManager public    {
-        candyToken.transfer(_to,_value);
+    function withdrawTokens() onlyManager public {
+        uint balanceCandy = candyToken.balanceOf(this);
+        uint balancePowerCandy = candyPowerToken.balanceOf(this);
+        require(balanceCandy > 0 || balancePowerCandy > 0);
+        if (balanceCandy > 0) {
+            candyToken.transfer(unicornManagement.walletAddress(), balanceCandy);
+        }
+        if (balancePowerCandy > 0) {
+            candyPowerToken.transfer(unicornManagement.walletAddress(), balancePowerCandy);
+        }
     }
+
 
     function transferEthersToDividendManager(uint _value) onlyManager public {
         require(this.balance >= _value);
@@ -2210,8 +2243,8 @@ contract UnicornBreeding is UnicornBase {
 contract Crowdsale is UnicornAccessControl {
     using SafeMath for uint;
 
-    event NewOffer(address indexed beneficiary, uint256 indexed offerId, uint256 indexed unicornId, uint price);
-    event OfferCancel(address indexed beneficiary, uint256 indexed offerId, uint256 indexed unicornId);
+    event NewOffer(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId, uint price);
+    event OfferCancel(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId);
     event UnicornSold(address indexed newOwner, uint256 indexed offerId, uint256 indexed unicornId);
     event FundsTransferred(address dividendManager, uint value);
 
@@ -2222,15 +2255,19 @@ contract Crowdsale is UnicornAccessControl {
     struct Offer{
         uint unicorn_id;
         uint price;
-        bool accepted;
+        uint marketIndex;
+//        bool accepted;
         bool exists;
+
     }
 
     // Mapping from offer ID to Offer struct
     mapping (uint => Offer) public offers;
     // Mapping from unicorn ID to offer ID
     mapping (uint => uint) public unicornOffer;
-
+    // queue_index => offerId
+    mapping(uint => uint) public market;
+    uint public marketSize = 0;
 
 
     function Crowdsale(address _unicornToken, address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
@@ -2243,7 +2280,7 @@ contract Crowdsale is UnicornAccessControl {
     }
 
 
-    function saleUnicorn(uint _unicornId, uint _price) public {
+    function sellUnicorn(uint _unicornId, uint _price) public {
         require(unicornToken.owns(msg.sender, _unicornId));
         require(unicornToken.allowance(this,_unicornId));
         require(!offers[unicornOffer[_unicornId]].exists);
@@ -2254,8 +2291,11 @@ contract Crowdsale is UnicornAccessControl {
         o.unicorn_id = _unicornId;
         o.price = _price;
         o.exists = true;
+        o.marketIndex = marketSize++;
 
         unicornOffer[_unicornId] = _offerId;
+        market[o.marketIndex] = _offerId;
+
 
         NewOffer(msg.sender, _offerId, _unicornId, _price);
     }
@@ -2265,9 +2305,9 @@ contract Crowdsale is UnicornAccessControl {
         //require(msg.value >= getPrice(unicornId));
         Offer storage o = offers[unicornOffer[_unicornId]];
         require(msg.value == unicornManagement.getSellUnicornFullPrice(o.price));
-        require(o.exists && !o.accepted);
+        require(o.exists);
 
-        o.accepted = true;
+//        o.accepted = true;
         //uint diff = msg.value - getPrice(unicornId);
         address owner = unicornToken.ownerOf(_unicornId);
 
@@ -2279,6 +2319,9 @@ contract Crowdsale is UnicornAccessControl {
 
         UnicornSold(msg.sender, unicornOffer[_unicornId], _unicornId);
 
+        offers[market[--marketSize]].marketIndex = o.marketIndex;
+        market[o.marketIndex] = market[marketSize];
+        delete market[marketSize];
         delete offers[unicornOffer[_unicornId]];
         delete unicornOffer[_unicornId];
     }
@@ -2287,10 +2330,13 @@ contract Crowdsale is UnicornAccessControl {
     function revokeUnicorn(uint _unicornId) public {
         require(unicornToken.owns(msg.sender, _unicornId));
         require(unicornToken.allowance(this, _unicornId));
-        require(offers[unicornOffer[_unicornId]].exists && !offers[unicornOffer[_unicornId]].accepted);
+        require(offers[unicornOffer[_unicornId]].exists);
 
         OfferCancel(msg.sender, unicornOffer[_unicornId], _unicornId);
 
+        offers[market[--marketSize]].marketIndex = offers[unicornOffer[_unicornId]].marketIndex;
+        market[offers[unicornOffer[_unicornId]].marketIndex] = market[marketSize];
+        delete market[marketSize];
         delete offers[unicornOffer[_unicornId]];
         delete unicornOffer[_unicornId];
     }
