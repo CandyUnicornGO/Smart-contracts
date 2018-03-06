@@ -2350,14 +2350,14 @@ contract UnicornBreeding is UnicornBase {
         address owner = ownerOf(_unicornId);
         //TODO
 
-        function clearApprovalAndTransfer(owner, msg.sender, _unicornId);
+        clearApprovalAndTransfer(owner, msg.sender, _unicornId);
         owner.transfer(o.price);
         //if (diff > 0) {
         //    msg.sender.transfer(diff);  // give change
         //}
 
         UnicornSold(msg.sender, unicornOffer[_unicornId], _unicornId);
-        _removeFromMarket(_unicornId);
+//        _removeFromMarket(_unicornId);
     }
 
 
