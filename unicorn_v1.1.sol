@@ -2317,6 +2317,9 @@ contract Crowdsale is UnicornAccessControl {
 
     function sellUnicorn(uint _unicornId, uint _price) public {
         require(unicornToken.owns(msg.sender, _unicornId));
+        // выставить и снять с продажи может только владелец без дополнительного предоставления
+        // approve на контракт crowdsale, но чтобы продажамогла состоятся, ему требуется в списке коней
+        // на продажу дополнительного каждому сделать approve для каждого
         //require(unicornToken.allowance(this,_unicornId));
         require(!offers[unicornOffer[_unicornId]].exists);
 
