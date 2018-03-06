@@ -2192,7 +2192,7 @@ contract UnicornBreeding is UnicornBase {
 
         blackBoxContract.createGen0.value(unicornManagement.oraclizeFee())(newUnicornId,_type);
 
-        CreateUnicorn(msg.sender,newUnicornId,0,0);
+        CreateUnicorn(_owner,newUnicornId,0,0);
         return newUnicornId;
     }
 
@@ -2364,7 +2364,7 @@ contract Crowdsale is UnicornAccessControl {
 
     function revokeUnicorn(uint _unicornId) public {
         require(unicornToken.owns(msg.sender, _unicornId));
-        require(unicornToken.allowance(this, _unicornId));
+        //require(unicornToken.allowance(this, _unicornId));
         require(offers[unicornOffer[_unicornId]].exists);
 
         OfferCancel(msg.sender, unicornOffer[_unicornId], _unicornId);
