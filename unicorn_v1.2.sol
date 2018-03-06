@@ -91,13 +91,13 @@ contract usingOraclize {
         return false;
     }
 
-//    function __callback(bytes32 myid, string result) public {
-//        __callback(myid, result, new bytes(0));
-//    }
-//    function __callback(bytes32 myid, string result, bytes proof) public {
-//        return;
-//        myid; result; proof; // Silence compiler warnings
-//    }
+    //    function __callback(bytes32 myid, string result) public {
+    //        __callback(myid, result, new bytes(0));
+    //    }
+    //    function __callback(bytes32 myid, string result, bytes proof) public {
+    //        return;
+    //        myid; result; proof; // Silence compiler warnings
+    //    }
 
     function oraclize_getPrice(string datasource) oraclizeAPI internal returns (uint){
         return oraclize.getPrice(datasource);
@@ -1321,7 +1321,7 @@ contract UnicornManagementInterface {
     //    function setOraclizeFee(uint _fee) external;
     //    function setSubFreezingPrice(uint _price) external;
     //    function setSubFreezingTime(uint _time) external;
-//    function setCreateUnicornFullPrice(uint _price, uint _candyPrice) external;
+    //    function setCreateUnicornFullPrice(uint _price, uint _candyPrice) external;
     function getCreateUnicornFullPrice() external view returns (uint);
     function getHybridizationFullPrice(uint _price) external view returns (uint);
     function getSellUnicornFullPrice(uint _price) external view returns (uint);
@@ -1657,6 +1657,11 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
     event UnicornFreezingTimeSet(uint indexed unicornId, uint time);
     event UnicornTourFreezingTimeSet(uint indexed unicornId, uint time);
 
+    event NewOffer(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId, uint price);
+    event UnicornSold(address indexed newOwner, uint256 indexed offerId, uint256 indexed unicornId);
+    event OfferDelete(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId);
+    //event OfferAutoCancel(uint indexed offerId, uint indexed unicornId);
+
     struct Unicorn {
         bytes gen;
         uint64 birthTime;
@@ -1828,7 +1833,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
 
         if (offers[unicornOffer[_unicornId]].exists) {
             _removeFromMarket(_unicornId);
-            OfferAutoCancel(_to, unicornOffer[_unicornId], _unicornId);
+            //OfferAutoCancel(unicornOffer[_unicornId], _unicornId);
         }
 
         clearApproval(_from, _unicornId);
@@ -1955,7 +1960,7 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
 
     function getUnicornGenByte(uint _unicornId, uint _byteNo) public view returns (uint8) {
         uint n = _byteNo << 1; // = _byteNo * 2
-//        require(unicorns[_unicornId].gen.length >= n + 1);
+        //        require(unicorns[_unicornId].gen.length >= n + 1);
         if (unicorns[_unicornId].gen.length < n + 1) {
             return 0;
         }
@@ -2030,23 +2035,27 @@ contract UnicornBase is ERC721, UnicornBreedingAccessControl {
             });
 
         unicornOffer[_unicornId] = _offerId;
-        market[o.marketIndex] = _offerId;
+        market[offers[_offerId].marketIndex] = _offerId;
+
+        NewOffer(msg.sender, _offerId, _unicornId, _price);
     }
 
     function _removeFromMarket(uint _unicornId) internal {
         offers[market[--marketSize]].marketIndex = offers[unicornOffer[_unicornId]].marketIndex;
         market[offers[unicornOffer[_unicornId]].marketIndex] = market[marketSize];
+
+        OfferDelete(msg.sender, unicornOffer[_unicornId], _unicornId);
+
         delete market[marketSize];
         delete offers[unicornOffer[_unicornId]];
         delete unicornOffer[_unicornId];
     }
 
 
-
 }
 
 
-contract UnicornBreeding is UnicornBase {
+contract UnicornControl is UnicornBase {
     using SafeMath for uint;
 
     event HybridizationAdded(uint indexed lastHybridizationId, uint indexed unicornId, uint price);
@@ -2056,9 +2065,7 @@ contract UnicornBreeding is UnicornBase {
     event CreateUnicorn(address indexed owner, uint indexed unicornId, uint indexed parent1, uint  parent2);
     event NewGen0Limit(uint limit);
     event NewGen0Step(uint step);
-    event NewOffer(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId, uint price);
-    event OfferCancel(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId);
-    event UnicornSold(address indexed newOwner, uint256 indexed offerId, uint256 indexed unicornId);
+
 
     ERC20 public candyToken; //SET on deploy
     ERC20 public candyPowerToken; //SET on deploy
@@ -2071,11 +2078,11 @@ contract UnicornBreeding is UnicornBase {
     uint internal maxType = 2;
     //limits for presale
     uint32[3] public typeLimits = [
-        150, 40, 10
+    150, 40, 10
     ];
 
     uint[3] public typeCounter = [
-        0, 0, 0
+    0, 0, 0
     ];
 
     //    uint public oraclizeFee;
@@ -2098,27 +2105,14 @@ contract UnicornBreeding is UnicornBase {
     mapping(uint => uint) private unicornHybridizationsIndex;
 
 
-
-
+    function UnicornControl(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
+        candyToken = ERC20(unicornManagement.candyToken());
+        candyPowerToken = ERC20(unicornManagement.candyPowerToken());
+    }
 
     function() public payable {
 
     }
-
-
-    function UnicornBreeding(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        candyToken = ERC20(unicornManagement.candyToken());
-        candyPowerToken = ERC20(unicornManagement.candyPowerToken());
-        //        lastHybridizationId = 0;
-        //        subFreezingPrice = 1000000000000000000;
-        //        subFreezingTime = 5 minutes;
-        //        dividendPercent = 375; //3.75%
-        //        createUnicornPrice = 10000000000000000;
-        //        createUnicornPriceInCandy = 1000000000000000000; //1 token
-        //        oraclizeFee = 10000000000000000;
-        //        gen0Count = 0;
-    }
-
 
     function makeHybridization(uint _unicornId, uint _price) onlyOwnerOf(_unicornId) public returns (uint)    {
         require(isReadyForHybridization(_unicornId));
@@ -2327,49 +2321,35 @@ contract UnicornBreeding is UnicornBase {
         NewGen0Step(gen0Limit);
     }
 
-    function sellUnicorn(uint _unicornId, uint _price) public {
-        require(owns(msg.sender, _unicornId));
-        // выставить и снять с продажи может только владелец без дополнительного предоставления
-        // approve на контракт crowdsale, но чтобы продажамогла состоятся, ему требуется в списке коней
-        // на продажу дополнительного каждому сделать approve для каждого
-        //require(allowance(this,_unicornId));
+    function sellUnicorn(uint _unicornId, uint _price) onlyOwnerOf(_unicornId) public {
         require(!offers[unicornOffer[_unicornId]].exists);
-        _addToMarket(uint _unicornId, uint _price)
-        NewOffer(msg.sender, _offerId, _unicornId, _price);
+        _addToMarket(_unicornId, _price);
     }
 
 
     function buyUnicorn(uint _unicornId) public payable {
-        //require(msg.value >= getPrice(unicornId));
         Offer storage o = offers[unicornOffer[_unicornId]];
         require(msg.value == unicornManagement.getSellUnicornFullPrice(o.price));
         require(o.exists);
 
-//        o.accepted = true;
-        //uint diff = msg.value - getPrice(unicornId);
         address owner = ownerOf(_unicornId);
-        //TODO
 
-        _removeFromMarket(_unicornId);
+        uint _offerId = unicornOffer[_unicornId];
+        //_removeFromMarket(_unicornId); //должна сработать в clearApprovalAndTransfer
         clearApprovalAndTransfer(owner, msg.sender, _unicornId);
         owner.transfer(o.price);
-        //if (diff > 0) {
-        //    msg.sender.transfer(diff);  // give change
-        //}
-        UnicornSold(msg.sender, unicornOffer[_unicornId], _unicornId);
+
+        UnicornSold(msg.sender, _offerId, _unicornId);
     }
 
 
-    function revokeUnicorn(uint _unicornId) public {
-        require(owns(msg.sender, _unicornId));
-        //        require(allowance(this, _unicornId));
+    function revokeUnicorn(uint _unicornId) onlyOwnerOf(_unicornId) public {
         require(offers[unicornOffer[_unicornId]].exists);
         _removeFromMarket(_unicornId);
-        OfferCancel(msg.sender, unicornOffer[_unicornId], _unicornId);
     }
 
 
-    function getPrice(uint _unicornId) public view returns (uint) {
+    function getSellUnicornPrice(uint _unicornId) public view returns (uint) {
         return unicornManagement.getSellUnicornFullPrice(offers[unicornOffer[_unicornId]].price);
     }
 
