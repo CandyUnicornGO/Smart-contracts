@@ -2335,7 +2335,7 @@ contract UnicornBreeding is UnicornBase {
         //require(allowance(this,_unicornId));
         require(!offers[unicornOffer[_unicornId]].exists);
         _addToMarket(uint _unicornId, uint _price)
-    NewOffer(msg.sender, _offerId, _unicornId, _price);
+        NewOffer(msg.sender, _offerId, _unicornId, _price);
     }
 
 
@@ -2345,19 +2345,18 @@ contract UnicornBreeding is UnicornBase {
         require(msg.value == unicornManagement.getSellUnicornFullPrice(o.price));
         require(o.exists);
 
-        //        o.accepted = true;
+//        o.accepted = true;
         //uint diff = msg.value - getPrice(unicornId);
         address owner = ownerOf(_unicornId);
         //TODO
 
+        _removeFromMarket(_unicornId);
         clearApprovalAndTransfer(owner, msg.sender, _unicornId);
         owner.transfer(o.price);
         //if (diff > 0) {
         //    msg.sender.transfer(diff);  // give change
         //}
-
         UnicornSold(msg.sender, unicornOffer[_unicornId], _unicornId);
-//        _removeFromMarket(_unicornId);
     }
 
 
@@ -2365,8 +2364,8 @@ contract UnicornBreeding is UnicornBase {
         require(owns(msg.sender, _unicornId));
         //        require(allowance(this, _unicornId));
         require(offers[unicornOffer[_unicornId]].exists);
-        OfferCancel(msg.sender, unicornOffer[_unicornId], _unicornId);
         _removeFromMarket(_unicornId);
+        OfferCancel(msg.sender, unicornOffer[_unicornId], _unicornId);
     }
 
 
