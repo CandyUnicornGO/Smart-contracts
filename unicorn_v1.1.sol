@@ -2359,11 +2359,8 @@ contract Crowdsale is UnicornAccessControl {
 
     function revokeUnicorn(uint _unicornId) public {
         require(unicornToken.owns(msg.sender, _unicornId));
-<<<<<<< HEAD
-        //require(unicornToken.allowance(this, _unicornId));
-=======
 //        require(unicornToken.allowance(this, _unicornId));
->>>>>>> 68a66b16c4d63a26bed644c5526ebc4cc8a0d577
+
         require(offers[unicornOffer[_unicornId]].exists);
 
         OfferCancel(msg.sender, unicornOffer[_unicornId], _unicornId);
