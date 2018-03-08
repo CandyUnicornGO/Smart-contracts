@@ -1569,33 +1569,33 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 }
 
 contract UnicornTokenAccessControl {
-        address public marketAddress; //only on deploy
-    address public breedingAddress; //only on deploy
+//        address public marketAddress; //only on deploy
+    address public unicornBreedingAddress; //only on deploy
 
-    UnicornBreedingInterface internal breedingContract; //only on deploy
-    UnicornMarketInterface internal marketContract; //only on deploy
+    UnicornBreedingInterface internal unicornBreeding; //only on deploy
+//    UnicornMarketInterface internal marketContract; //only on deploy
 
-    modifier onlyMarket() {
-        require(msg.sender == marketAddress);
-        _;
-    }
+//    modifier onlyMarket() {
+//        require(msg.sender == marketAddress);
+//        _;
+//    }
 
     modifier onlyBreeding() {
-        require(msg.sender == breedingAddress);
+        require(msg.sender == unicornBreedingAddress);
         _;
     }
-        //TODO remove after test!!!!
-        function setBreeding(address _breedingAddress)  external {
-            require(_breedingAddress != address(0));
-            breedingAddress = _breedingAddress;
-                breedingContract = UnicornBreedingInterface(breedingAddress);
-        }
-        //TODO remove after test!!!!
-        function setMarket(address _marketAddress) external {
-            require(_marketAddress != address(0));
-            marketAddress = _marketAddress;
-            marketContract = UnicornMarketInterface(marketAddress);
-        }
+//        //TODO remove after test!!!!
+//        function setBreeding(address _unicornBreedingAddress)  external {
+//            require(_unicornBreedingAddress != address(0));
+//            unicornBreedingAddress = _unicornBreedingAddress;
+//                unicornBreeding = UnicornBreedingInterface(unicornBreedingAddress);
+//        }
+//        //TODO remove after test!!!!
+//        function setMarket(address _marketAddress) external {
+//            require(_marketAddress != address(0));
+//            marketAddress = _marketAddress;
+//            marketContract = UnicornMarketInterface(marketAddress);
+//        }
 
 }
 
@@ -1794,7 +1794,7 @@ contract UnicornBase is UnicornTokenInterface, UnicornTokenAccessControl {
 
         //TODO check if contract exists
         //        if (marketAddress != address(0)) {
-            marketContract.deleteOffer(_unicornId);
+        unicornBreeding.deleteOffer(_unicornId);
         //        }
     }
 
@@ -1914,7 +1914,7 @@ contract UnicornBase is UnicornTokenInterface, UnicornTokenAccessControl {
     }
 
     //transfer by market
-    function marketTransfer(address _from, address _to, uint256 _unicornId) onlyMarket external {
+    function marketTransfer(address _from, address _to, uint256 _unicornId) onlyBreeding external {
         clearApprovalAndTransfer(_from, _to, _unicornId);
     }
 
@@ -1981,12 +1981,13 @@ contract UnicornToken is UnicornBase {
     string public constant name = "UnicornGO";
     string public constant symbol = "UNG";
 
-    function UnicornToken(address _breedingAddress, address _marketAddress) public {
-                marketAddress = _marketAddress;
-        breedingAddress = _breedingAddress;
+    function UnicornToken(address _unicornBreedingAddress) public {
+//    function UnicornToken(address _unicornBreedingAddress, address _marketAddress) public {
+//                marketAddress = _marketAddress;
+        unicornBreedingAddress = _unicornBreedingAddress;
     }
 
-    function() public  {
+    function() public {
 
     }
 }
@@ -2397,138 +2398,8 @@ contract UnicornBreeding is UnicornBreedingAccessControl {
         }
     }
 
-    function getMarketPrice(uint _unicornId) public view returns (uint) {
-        return unicornManagement.getSellUnicornFullPrice(offers[unicornOffer[_unicornId]].price);
-    }
-
-}
-
-
-contract UnicornMarketAccessControl is UnicornAccessControl {
-    address public unicornTokenAddress;
-    UnicornTokenInterface internal unicornToken;
-
-    modifier onlyUnicornToken() {
-        require(msg.sender == unicornTokenAddress);
-        _;
-    }
-
-    function setUnicornToken(address _unicornTokenAddress) external onlyOwner whenPaused    {
-        require(_unicornTokenAddress != address(0));
-        unicornToken = UnicornTokenInterface(_unicornTokenAddress);
-        unicornTokenAddress = _unicornTokenAddress;
-    }
-}
-
-
-
-contract UnicornMarket is UnicornMarketAccessControl {
-    using SafeMath for uint;
-
-    event NewOffer(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId, uint price);
-    event OfferDelete(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId);
-    event UnicornSold(address indexed newOwner, uint256 indexed offerId, uint256 indexed unicornId);
-    event FundsTransferred(address dividendManager, uint value);
-
-
-    uint public lastOfferId = 0;
-
-    struct Offer{
-        uint unicorn_id;
-        uint price;
-        uint marketIndex;
-        //        bool accepted;
-        bool exists;
-
-    }
-
-    // Mapping from offer ID to Offer struct
-    mapping (uint => Offer) public offers;
-    // Mapping from unicorn ID to offer ID
-    mapping (uint => uint) public unicornOffer;
-    // market index => offerId
-    mapping(uint => uint) public market;
-    uint public marketSize = 0;
-
-
-    function UnicornMarket(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-
-    }
-
-
-    function () public payable {
-
-    }
-
-
-    function sellUnicorn(uint _unicornId, uint _price) public {
-        require(unicornToken.owns(msg.sender, _unicornId));
-        require(!offers[unicornOffer[_unicornId]].exists);
-
-        uint256 _offerId = ++lastOfferId;
-        Offer storage o = offers[_offerId];
-
-        o.unicorn_id = _unicornId;
-        o.price = _price;
-        o.exists = true;
-        o.marketIndex = marketSize++;
-
-        unicornOffer[_unicornId] = _offerId;
-        market[o.marketIndex] = _offerId;
-
-
-        NewOffer(msg.sender, _offerId, _unicornId, _price);
-    }
-
-
-    function buyUnicorn(uint _unicornId) public payable {
-        require(offers[unicornOffer[_unicornId]].exists);
-        uint price = offers[unicornOffer[_unicornId]].price;
-        require(msg.value == unicornManagement.getSellUnicornFullPrice(price));
-
-        address owner = unicornToken.ownerOf(_unicornId);
-
-        UnicornSold(msg.sender, unicornOffer[_unicornId], _unicornId);
-        //deleteoffer вызовется внутри transfer
-        unicornToken.marketTransfer(owner, msg.sender, _unicornId);
-        owner.transfer(price);
-        //        _deleteOffer(_unicornId);
-    }
-
-
-    function revokeUnicorn(uint _unicornId) public {
-        require(unicornToken.owns(msg.sender, _unicornId));
-        require(offers[unicornOffer[_unicornId]].exists);
-        _deleteOffer(_unicornId);
-    }
-
-
-    function deleteOffer(uint _unicornId) onlyUnicornToken public {
-        _deleteOffer(_unicornId);
-    }
-
-
-    function _deleteOffer(uint _unicornId) internal {
-        if (offers[unicornOffer[_unicornId]].exists) {
-            OfferDelete(msg.sender, unicornOffer[_unicornId], _unicornId);
-
-            offers[market[--marketSize]].marketIndex = offers[unicornOffer[_unicornId]].marketIndex;
-            market[offers[unicornOffer[_unicornId]].marketIndex] = market[marketSize];
-            delete market[marketSize];
-            delete offers[unicornOffer[_unicornId]];
-            delete unicornOffer[_unicornId];
-        }
-    }
-
     function getOfferPrice(uint _unicornId) public view returns (uint) {
         return unicornManagement.getSellUnicornFullPrice(offers[unicornOffer[_unicornId]].price);
-    }
-
-    function transferEthersToDividendManager(uint _value) onlyManager public {
-        require(this.balance >= _value);
-        DividendManagerInterface dividendManager = DividendManagerInterface(unicornManagement.dividendManagerAddress());
-        dividendManager.payDividend.value(_value)();
-        FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
     }
 
 }
