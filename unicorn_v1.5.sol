@@ -1070,6 +1070,7 @@ contract UnicornManagement {
     uint public oraclizeFee = 3000000000000000; //0.003 ETH
 
     bool public paused = true;
+    //    bool public locked = false;
 
     mapping(address => bool) tournaments;//address
 
@@ -1119,6 +1120,11 @@ contract UnicornManagement {
         require(paused);
         _;
     }
+
+    //    modifier whenUnlocked() {
+    //        require(!locked);
+    //        _;
+    //    }
 
     function UnicornManagement(address _candyToken, address _candyPowerToken) public {
         ownerAddress = msg.sender;
@@ -2001,18 +2007,18 @@ contract UnicornBreeding is UnicornAccessControl {
     //onlyOwner
     UnicornTokenInterface public unicornToken; //only on deploy
 
-    event HybridizationAdded(uint indexed lastHybridizationId, uint indexed unicornId, uint price);
-    event HybridizationAccepted(uint indexed hybridizationId, uint indexed unicornId, uint newUnicornId);
-    event HybridizationCancelled(uint indexed hybridizationId);
+    event HybridizationAdd(uint indexed unicornId, uint price);
+    event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId);
+    event HybridizationDelete(uint indexed unicornId);
     event FundsTransferred(address dividendManager, uint value);
     event CreateUnicorn(address indexed owner, uint indexed unicornId, uint indexed parent1, uint  parent2);
     event NewGen0Limit(uint limit);
     event NewGen0Step(uint step);
 
 
-    event NewOffer(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId, uint price);
-    event OfferDelete(address indexed owner, uint256 indexed offerId, uint256 indexed unicornId);
-    event UnicornSold(address indexed newOwner, uint256 indexed offerId, uint256 indexed unicornId);
+    event OfferAdd(uint256 indexed unicornId, uint price);
+    event OfferDelete(uint256 indexed unicornId);
+    event UnicornSold(uint256 indexed unicornId);
 
     ERC20 public candyToken; //SET on deploy
     ERC20 public candyPowerToken; //SET on deploy
@@ -2038,27 +2044,30 @@ contract UnicornBreeding is UnicornAccessControl {
 
     //    uint public oraclizeFee;
 
-    uint public lastHybridizationId = 0;
+    //    uint public lastHybridizationId = 0;
 
     struct Hybridization{
-        uint unicorn_id;
+        uint listIndex;
         uint price;
-        uint second_unicorn_id;
-        bool accepted;
+        //        uint second_unicorn_id;
+        //        bool accepted;
         bool exists;
     }
 
-    // Mapping from hybridization ID to Hybridization struct
+    // Mapping from unicorn ID to Hybridization struct
     mapping (uint => Hybridization) public hybridizations;
     // Mapping from unicorn ID to list of it hybridization IDs
-    mapping (uint => uint[]) private unicornHybridizations;
+    //    mapping (uint => uint[]) private unicornHybridizations;
     // Mapping from hybridization ID to index of the unicorn ID hybridizations list
-    mapping(uint => uint) private unicornHybridizationsIndex;
+    //    mapping(uint => uint) private unicornHybridizationsIndex;
+
+    mapping(uint => uint) public hybridizationList;
+    uint public hybridizationListSize = 0;
+
 
     function() public payable {
 
     }
-
 
     function UnicornBreeding(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
         candyToken = ERC20(unicornManagement.candyToken());
@@ -2070,84 +2079,61 @@ contract UnicornBreeding is UnicornAccessControl {
         unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
     }
 
-    //TODO compare gas
-    //    function makeHybridization(uint _unicornId, uint _price) onlyOwnerOf(_unicornId) public returns (uint)    {
-    function makeHybridization(uint _unicornId, uint _price) public returns (uint) {
+    function makeHybridization(uint _unicornId, uint _price) public {
         require(unicornToken.owns(msg.sender, _unicornId));
         require(unicornToken.isUnfreezed(_unicornId));
+        require(!hybridizations[_unicornId].exists);
 
-        uint256 _hybridizationId = ++lastHybridizationId;
-        Hybridization storage h = hybridizations[_hybridizationId];
+        hybridizations[_unicornId] = Hybridization({
+            price: _price,
+            exists: true,
+            listIndex: hybridizationListSize
+            });
+        hybridizationList[hybridizationListSize++] = _unicornId;
 
-        h.unicorn_id = _unicornId;
-        h.price = _price;
-        h.exists = true;
-
-        // save hybridization in mapping for unicorn
-        uint256 newHIndex = unicornHybridizations[h.unicorn_id].length;
-        unicornHybridizations[h.unicorn_id].push(_hybridizationId); //save hybridization ID in array
-        unicornHybridizationsIndex[_hybridizationId] = newHIndex; //save index for hybridization
-
-        HybridizationAdded(_hybridizationId, h.unicorn_id, h.price);
-
-        return _hybridizationId;
+        HybridizationAdd(_unicornId, _price);
     }
 
 
-    function acceptHybridization(uint _hybridizationId, uint _unicornId) whenNotPaused public payable {
-        require(unicornToken.owns(msg.sender, _unicornId));
-        Hybridization storage h = hybridizations[_hybridizationId];
-        require(h.exists && !h.accepted);
-        require(_unicornId != h.unicorn_id);
-        require(unicornToken.isUnfreezed(_unicornId) && unicornToken.isUnfreezed(h.unicorn_id));
-
+    function acceptHybridization(uint _firstUnicornId, uint _secondUnicornId) whenNotPaused public payable {
+        require(unicornToken.owns(msg.sender, _secondUnicornId));
+        require(_secondUnicornId != _firstUnicornId);
+        require(unicornToken.isUnfreezed(_firstUnicornId) && unicornToken.isUnfreezed(_secondUnicornId));
+        require(hybridizations[_firstUnicornId].exists);
         require(msg.value == unicornManagement.oraclizeFee());
-        require(candyToken.transferFrom(msg.sender, this, getHybridizationPrice(_hybridizationId)));
+        require(candyToken.transferFrom(msg.sender, this, getHybridizationPrice(_firstUnicornId)));
 
-        //require(msg.value == getHybridizationPrice(_hybridizationId));
-
-
-        h.second_unicorn_id = _unicornId;
-        // !!!
-        h.accepted = true;
-        plusFreezingTime(_unicornId);
-
-        uint256 childUnicornId  = _createUnicorn(msg.sender, h.unicorn_id, h.second_unicorn_id);
+        plusFreezingTime(_secondUnicornId);
+        uint256 childUnicornId  = _createUnicorn(msg.sender, _firstUnicornId, _secondUnicornId);
         BlackBoxInterface blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
-        blackBox.geneCore.value(unicornManagement.oraclizeFee())(childUnicornId, h.unicorn_id, h.second_unicorn_id);
+        blackBox.geneCore.value(unicornManagement.oraclizeFee())(childUnicornId, _firstUnicornId, _secondUnicornId);
 
-        unicornToken.ownerOf(h.unicorn_id).transfer(h.price);
-        HybridizationAccepted(_hybridizationId, _unicornId, childUnicornId);
+        candyToken.transfer(unicornToken.ownerOf(_firstUnicornId), hybridizations[_firstUnicornId].price);
+        HybridizationAccept(_firstUnicornId, _secondUnicornId, childUnicornId);
+        _deleteHybridization(_firstUnicornId);
     }
 
 
-    function cancelHybridization (uint _hybridizationId) public     {
-        Hybridization storage h = hybridizations[_hybridizationId];
-        require(h.exists && !h.accepted);
-        require(unicornToken.owns(msg.sender, h.unicorn_id));
-        //        require(owns(msg.sender, h.unicorn_id));
-
-        // remove hybridization in mapping for unicorn
-        uint256 hIndex = unicornHybridizationsIndex[_hybridizationId];
-        uint256 lastHIndex = unicornHybridizations[h.unicorn_id].length.sub(1);
-        uint256 lastHId = unicornHybridizations[h.unicorn_id][lastHIndex];
-
-        unicornHybridizations[h.unicorn_id][hIndex] = lastHId; //replace hybridization ID with last
-        unicornHybridizationsIndex[lastHId] = hIndex; //update index for last hybridization ID
-        unicornHybridizations[h.unicorn_id][lastHIndex] = 0; //reset hybridization ID at last postion
-        unicornHybridizations[h.unicorn_id].length--; //reduce array size
-        unicornHybridizationsIndex[_hybridizationId] = 0; // reset hybridization ID index
-
-        delete hybridizations[_hybridizationId];
-
-        HybridizationCancelled(_hybridizationId);
+    function cancelHybridization (uint _unicornId) public {
+        require(unicornToken.owns(msg.sender,_unicornId));
+        require(hybridizations[_unicornId].exists);
+        _deleteHybridization(_unicornId);
     }
 
+    function _deleteHybridization(uint _unicornId) internal {
+        if (hybridizations[_unicornId].exists) {
+            hybridizations[hybridizationList[--hybridizationListSize]].listIndex = hybridizations[_unicornId].listIndex;
+            hybridizationList[hybridizations[_unicornId].listIndex] = hybridizationList[hybridizationListSize];
+            delete hybridizationList[hybridizationListSize];
+            delete hybridizations[_unicornId];
+            HybridizationDelete(_unicornId);
+        }
+    }
 
     // Gets the list of hybridizations of unicorn
-    function hybridizationsOf(uint _unicornId) public view returns (uint256[]) {
-        return unicornHybridizations[_unicornId];
-    }
+    //    function hybridizationsOf(uint _unicornId) public view returns (uint256[]) {
+    //        return unicornHybridizations[_unicornId];
+    //    }
 
 
     //Create new 0 gen
@@ -2199,8 +2185,8 @@ contract UnicornBreeding is UnicornAccessControl {
         unicornToken.minusTourFreezingTime(_unicornId, unicornManagement.subTourFreezingTime());
     }
 
-    function getHybridizationPrice(uint _hybridizationId) public view returns (uint) {
-        return unicornManagement.getHybridizationFullPrice(hybridizations[_hybridizationId].price);
+    function getHybridizationPrice(uint _unicornId) public view returns (uint) {
+        return unicornManagement.getHybridizationFullPrice(hybridizations[_unicornId].price);
     }
 
     function getEtherFeeForPriceInCandy() public view returns (uint) {
@@ -2254,13 +2240,10 @@ contract UnicornBreeding is UnicornAccessControl {
 
 
     ////MARKET
-
-    uint public lastOfferId = 0;
-
     struct Offer{
-        uint unicorn_id;
-        uint price;
+        //        uint unicorn_id;
         uint marketIndex;
+        uint price;
         //        bool accepted;
         bool exists;
     }
@@ -2268,7 +2251,7 @@ contract UnicornBreeding is UnicornAccessControl {
     // Mapping from unicorn ID to Offer struct
     mapping (uint => Offer) public offers;
     // Mapping from unicorn ID to offer ID
-    mapping (uint => uint) public unicornOffer;
+    //    mapping (uint => uint) public unicornOffer;
     // market index => offerId
     mapping(uint => uint) public market;
     uint public marketSize = 0;
@@ -2276,31 +2259,28 @@ contract UnicornBreeding is UnicornAccessControl {
 
     function sellUnicorn(uint _unicornId, uint _price) public {
         require(unicornToken.owns(msg.sender, _unicornId));
-        require(!offers[unicornOffer[_unicornId]].exists);
+        require(!offers[_unicornId].exists);
 
-        uint256 _offerId = ++lastOfferId;
-        Offer storage o = offers[_offerId];
+        offers[_unicornId] = Offer({
+            price: _price,
+            exists: true,
+            marketIndex: marketSize
+            });
 
-        o.unicorn_id = _unicornId;
-        o.price = _price;
-        o.exists = true;
-        o.marketIndex = marketSize++;
+        market[marketSize++] = _unicornId;
 
-        unicornOffer[_unicornId] = _offerId;
-        market[o.marketIndex] = _offerId;
-
-        NewOffer(msg.sender, _offerId, _unicornId, _price);
+        OfferAdd(_unicornId, _price);
     }
 
 
     function buyUnicorn(uint _unicornId) public payable {
-        require(offers[unicornOffer[_unicornId]].exists);
-        uint price = offers[unicornOffer[_unicornId]].price;
+        require(offers[_unicornId].exists);
+        uint price = offers[_unicornId].price;
         require(msg.value == unicornManagement.getSellUnicornFullPrice(price));
 
         address owner = unicornToken.ownerOf(_unicornId);
 
-        UnicornSold(msg.sender, unicornOffer[_unicornId], _unicornId);
+        UnicornSold(_unicornId);
         //deleteoffer вызовется внутри transfer
         unicornToken.marketTransfer(owner, msg.sender, _unicornId);
         owner.transfer(price);
@@ -2310,7 +2290,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     function revokeUnicorn(uint _unicornId) public {
         require(unicornToken.owns(msg.sender, _unicornId));
-        require(offers[unicornOffer[_unicornId]].exists);
+        require(offers[_unicornId].exists);
         _deleteOffer(_unicornId);
     }
 
@@ -2321,19 +2301,17 @@ contract UnicornBreeding is UnicornAccessControl {
 
 
     function _deleteOffer(uint _unicornId) internal {
-        if (offers[unicornOffer[_unicornId]].exists) {
-            OfferDelete(msg.sender, unicornOffer[_unicornId], _unicornId);
-
-            offers[market[--marketSize]].marketIndex = offers[unicornOffer[_unicornId]].marketIndex;
-            market[offers[unicornOffer[_unicornId]].marketIndex] = market[marketSize];
+        if (offers[_unicornId].exists) {
+            offers[market[--marketSize]].marketIndex = offers[_unicornId].marketIndex;
+            market[offers[_unicornId].marketIndex] = market[marketSize];
             delete market[marketSize];
-            delete offers[unicornOffer[_unicornId]];
-            delete unicornOffer[_unicornId];
+            delete offers[_unicornId];
+            OfferDelete(_unicornId);
         }
     }
 
     function getOfferPrice(uint _unicornId) public view returns (uint) {
-        return unicornManagement.getSellUnicornFullPrice(offers[unicornOffer[_unicornId]].price);
+        return unicornManagement.getSellUnicornFullPrice(offers[_unicornId].price);
     }
 
 }
