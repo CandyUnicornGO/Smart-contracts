@@ -1070,7 +1070,7 @@ contract UnicornManagement {
     uint public oraclizeFee = 3000000000000000; //0.003 ETH
 
     bool public paused = true;
-    //    bool public locked = false;
+    bool public locked = false;
 
     mapping(address => bool) tournaments;//address
 
@@ -1121,10 +1121,14 @@ contract UnicornManagement {
         _;
     }
 
-    //    modifier whenUnlocked() {
-    //        require(!locked);
-    //        _;
-    //    }
+    modifier whenUnlocked() {
+        require(!locked);
+        _;
+    }
+
+    function lock() external onlyOwner whenPaused whenUnlocked {
+        locked = true;
+    }
 
     function UnicornManagement(address _candyToken, address _candyPowerToken) public {
         ownerAddress = msg.sender;
@@ -1135,9 +1139,9 @@ contract UnicornManagement {
         candyPowerToken = _candyPowerToken;
     }
 
-    function setUnicornToken(address _unicornTokenAddress) external onlyOwner whenPaused    {
+    function setUnicornToken(address _unicornTokenAddress) external onlyOwner whenPaused whenUnlocked {
         require(_unicornTokenAddress != address(0));
-        require(unicornTokenAddress == address(0));
+//        require(unicornTokenAddress == address(0));
         unicornTokenAddress = _unicornTokenAddress;
     }
 
@@ -1152,9 +1156,9 @@ contract UnicornManagement {
         geneLabAddress = _geneLabAddress;
     }
 
-    function setUnicornBreeding(address _unicornBreedingAddress) external onlyOwner whenPaused {
+    function setUnicornBreeding(address _unicornBreedingAddress) external onlyOwner whenPaused whenUnlocked {
         require(_unicornBreedingAddress != address(0));
-        require(unicornBreedingAddress == address(0));
+//        require(unicornBreedingAddress == address(0));
         unicornBreedingAddress = _unicornBreedingAddress;
     }
 
@@ -1322,6 +1326,7 @@ contract UnicornManagementInterface {
     function oraclizeFee() external view returns (uint);
 
     function paused() external view returns (bool);
+//    function locked() external view returns (bool);
 
     function isTournament(address _tournamentAddress) external view returns (bool);
 
@@ -1335,6 +1340,7 @@ contract UnicornManagementInterface {
 contract UnicornAccessControl {
 
     UnicornManagementInterface public unicornManagement;
+
 
     function UnicornAccessControl(address _unicornManagementAddress) public {
         unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
@@ -1374,6 +1380,11 @@ contract UnicornAccessControl {
         require(unicornManagement.paused());
         _;
     }
+
+//    modifier whenUnlocked() {
+//        require(!unicornManagement.locked());
+//        _;
+//    }
 
     modifier onlyBreeding() {
         require(msg.sender == unicornManagement.unicornBreedingAddress());
@@ -1422,6 +1433,7 @@ contract BlackBoxInterface {
 
 
 contract BlackBoxController is UnicornAccessControl, usingOraclize  {
+    UnicornTokenInterface public unicornToken;
     struct Request {
         string request;
         uint queueIndex;
@@ -1456,6 +1468,10 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
         oraclize_setCustomGasPrice(2000000000 wei);
     }
 
+    function init() onlyOwner whenPaused external {
+        unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
+    }
+
     function() public payable {
         //
     }
@@ -1467,7 +1483,7 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
 
         bytes memory gene = bytes(result);
         uint unicornId = validIds[hash] - 1;
-        UnicornTokenInterface unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
+//        UnicornTokenInterface unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
         unicornToken.setGene(unicornId, gene);
         //        logRes(result);
 
@@ -1555,12 +1571,12 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
 
 
     function setGeneManual(uint unicornId, string gene) public onlyOwner{
-        UnicornTokenInterface unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
+//        UnicornTokenInterface unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
         unicornToken.setGene(unicornId, bytes(gene));
     }
 
 
-    function geneCoreManual(uint _unicornId) onlyOwner public {
+    function geneCoreRetry(uint _unicornId) onlyOwner public payable {
         require(bytes(requests[_unicornId].request).length > 0);
         if (oraclize_getPrice("URL") > this.balance) {
             revert();
@@ -1573,7 +1589,7 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
     }
 
 
-    function createGen0Manual(uint _unicornId) onlyOwner public payable {
+    function createGen0Retry(uint _unicornId) onlyOwner public payable {
         require(bytes(requests[_unicornId].request).length > 0);
         if (oraclize_getPrice("URL") > this.balance) {
             // LogNewOraclizeQuery("CreateGen0 query was NOT sent, please add some ETH to cover for the query fee");
@@ -1993,6 +2009,10 @@ contract UnicornToken is UnicornBase {
     string public constant symbol = "UNG";
 
     function UnicornToken(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
+
+    }
+
+    function init() onlyOwner whenPaused external {
         unicornBreeding = UnicornBreedingInterface(unicornManagement.unicornBreedingAddress());
     }
 
@@ -2006,6 +2026,7 @@ contract UnicornBreeding is UnicornAccessControl {
     using SafeMath for uint;
     //onlyOwner
     UnicornTokenInterface public unicornToken; //only on deploy
+    BlackBoxInterface public blackBox;
 
     event HybridizationAdd(uint indexed unicornId, uint price);
     event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId);
@@ -2072,11 +2093,11 @@ contract UnicornBreeding is UnicornAccessControl {
     function UnicornBreeding(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
         candyToken = ERC20(unicornManagement.candyToken());
         candyPowerToken = ERC20(unicornManagement.candyPowerToken());
-
     }
 
-    function setUnicornToken() onlyOwner external {
+    function init() onlyOwner whenPaused external {
         unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
+        blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
     }
 
     function makeHybridization(uint _unicornId, uint _price) public {
@@ -2104,12 +2125,13 @@ contract UnicornBreeding is UnicornAccessControl {
         require(candyToken.transferFrom(msg.sender, this, getHybridizationPrice(_firstUnicornId)));
 
         plusFreezingTime(_secondUnicornId);
-        uint256 childUnicornId  = _createUnicorn(msg.sender, _firstUnicornId, _secondUnicornId);
-        BlackBoxInterface blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
-        blackBox.geneCore.value(unicornManagement.oraclizeFee())(childUnicornId, _firstUnicornId, _secondUnicornId);
+        uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
+//        BlackBoxInterface blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
+        blackBox.geneCore.value(unicornManagement.oraclizeFee())(newUnicornId, _firstUnicornId, _secondUnicornId);
+        CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
 
         candyToken.transfer(unicornToken.ownerOf(_firstUnicornId), hybridizations[_firstUnicornId].price);
-        HybridizationAccept(_firstUnicornId, _secondUnicornId, childUnicornId);
+        HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId);
         _deleteHybridization(_firstUnicornId);
     }
 
@@ -2139,28 +2161,28 @@ contract UnicornBreeding is UnicornAccessControl {
     //Create new 0 gen
     function createUnicorn() public payable whenNotPaused returns(uint256)   {
         require(msg.value == getCreateUnicornPrice());
-        return _createUnicorn(msg.sender, 0, 0);
+        return _createUnicorn(msg.sender);
     }
 
     function createUnicornForCandy() public payable whenNotPaused returns(uint256)   {
         require(msg.value == unicornManagement.oraclizeFee());
         require(candyToken.transferFrom(msg.sender, this, getCreateUnicornPriceInCandy()));
-        return _createUnicorn(msg.sender, 0, 0);
+        return _createUnicorn(msg.sender);
     }
 
     function createPresaleUnicorn(address _owner) public payable onlyManager whenPaused returns(uint256) {
         require(gen0PresaleCount < gen0PresaleLimit);
         require(msg.value == unicornManagement.oraclizeFee());
         gen0PresaleCount = gen0PresaleCount.add(1);
-        return _createUnicorn(_owner == address(0) ? msg.sender : _owner, 0, 0);
+        return _createUnicorn(_owner == address(0) ? msg.sender : _owner);
     }
 
-    function _createUnicorn(address _owner, uint _parent1Id, uint _parent2Id) private returns(uint256) {
+    function _createUnicorn(address _owner) private returns(uint256) {
         require(gen0Count < gen0Limit);
         uint256 newUnicornId = unicornToken.createUnicorn(_owner);
-        BlackBoxInterface blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
+//        BlackBoxInterface blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
         blackBox.createGen0.value(unicornManagement.oraclizeFee())(newUnicornId);
-        CreateUnicorn(_owner, newUnicornId, _parent1Id, _parent2Id);
+        CreateUnicorn(_owner, newUnicornId, 0, 0);
         gen0Count = gen0Count.add(1);
         return newUnicornId;
     }
