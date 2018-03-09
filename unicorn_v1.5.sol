@@ -1043,7 +1043,9 @@ library SafeMath {
     }
 }
 
-
+//contract UnicornInit() {
+//    function init() external;
+//}
 contract UnicornManagement {
     using SafeMath for uint;
 
@@ -1803,12 +1805,6 @@ contract UnicornBase is UnicornAccessControl {
         removeUnicorn(_from, _unicornId);
         addUnicorn(_to, _unicornId);
         Transfer(_from, _to, _unicornId);
-
-
-        //TODO check if contract exists
-        //        if (address(unicornBreeding) != address(0)) {
-        unicornBreeding.deleteOffer(_unicornId);
-        //        }
     }
 
     /**
@@ -1860,6 +1856,12 @@ contract UnicornBase is UnicornAccessControl {
         ownedUnicornsIndex[_unicornId] = 0;
         ownedUnicornsIndex[lastUnicorn] = unicornIndex;
         totalUnicorns = totalUnicorns.sub(1);
+
+        //deleting sale offer, if exists
+        //TODO check if contract exists
+        //        if (address(unicornBreeding) != address(0)) {
+        unicornBreeding.deleteOffer(_unicornId);
+        //        }
     }
 
     //specific
