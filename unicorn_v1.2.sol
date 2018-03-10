@@ -2106,8 +2106,7 @@ contract UnicornControl is UnicornBase {
 
 
     function UnicornControl(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        candyToken = ERC20(unicornManagement.candyToken());
-        candyPowerToken = ERC20(unicornManagement.candyPowerToken());
+
     }
 
     function() public payable {
@@ -2210,6 +2209,8 @@ contract UnicornControl is UnicornBase {
     function createUnicornForCandy() public payable whenNotPaused returns(uint256)   {
         require(gen0Count < gen0Limit);
 
+        candyToken = ERC20(unicornManagement.candyToken());
+
         require(msg.value == unicornManagement.oraclizeFee());
         require(candyToken.transferFrom(msg.sender, this, getCreateUnicornPriceInCandy()));
 
@@ -2263,6 +2264,7 @@ contract UnicornControl is UnicornBase {
     //change tour freezing time for candy
     function minusTourFreezingTime(uint _unicornId) public {
         //не минусуем на уже размороженных конях
+        candyPowerToken = ERC20(unicornManagement.candyPowerToken());
         require(unicorns[_unicornId].freezingTourEndTime > now);
         require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subTourFreezingPrice()));
         //не используем safeMath, т.к. subTourFreezingTime в теории не должен быть больше now %)
@@ -2290,6 +2292,8 @@ contract UnicornControl is UnicornBase {
 
 
     function withdrawTokens() onlyManager public {
+        candyPowerToken = ERC20(unicornManagement.candyPowerToken());
+        candyToken = ERC20(unicornManagement.candyToken());
         uint balanceCandy = candyToken.balanceOf(this);
         uint balancePowerCandy = candyPowerToken.balanceOf(this);
         require(balanceCandy > 0 || balancePowerCandy > 0);
