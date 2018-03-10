@@ -2112,7 +2112,7 @@ contract UnicornBreeding is UnicornAccessControl {
     uint public gen0Step = 1000;
 
     //counter for presale gen0
-    uint public gen0PresaleLimit = 331;
+    uint public gen0PresaleLimit = 1000;
     uint public gen0PresaleCount = 0;
 
     struct Hybridization{
