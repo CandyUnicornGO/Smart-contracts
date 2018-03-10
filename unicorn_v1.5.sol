@@ -2112,22 +2112,8 @@ contract UnicornBreeding is UnicornAccessControl {
     uint public gen0Step = 1000;
 
     //counter for presale gen0
-    uint public gen0PresaleLimit = 30000;
+    uint public gen0PresaleLimit = 331;
     uint public gen0PresaleCount = 0;
-
-    //    uint internal maxType = 2;
-    //    //limits for presale
-    //    uint32[3] public typeLimits = [
-    //    150, 40, 10
-    //    ];
-    //
-    //    uint[3] public typeCounter = [
-    //    0, 0, 0
-    //    ];
-
-    //    uint public oraclizeFee;
-
-    //    uint public lastHybridizationId = 0;
 
     struct Hybridization{
         uint listIndex;
@@ -2139,11 +2125,6 @@ contract UnicornBreeding is UnicornAccessControl {
 
     // Mapping from unicorn ID to Hybridization struct
     mapping (uint => Hybridization) public hybridizations;
-    // Mapping from unicorn ID to list of it hybridization IDs
-    //    mapping (uint => uint[]) private unicornHybridizations;
-    // Mapping from hybridization ID to index of the unicorn ID hybridizations list
-    //    mapping(uint => uint) private unicornHybridizationsIndex;
-
     mapping(uint => uint) public hybridizationList;
     uint public hybridizationListSize = 0;
 
