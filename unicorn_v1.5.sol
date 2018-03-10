@@ -1134,8 +1134,7 @@ contract UnicornManagement {
         locked = true;
     }
 
-    //TODO сменный candypower
-    function UnicornManagement(address _candyToken) public {
+    function UnicornManagement(address _candyToken, address _candyPowerToken) public {
         ownerAddress = msg.sender;
         managerAddress = msg.sender;
         communityAddress = msg.sender;
