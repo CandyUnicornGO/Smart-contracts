@@ -2240,29 +2240,19 @@ contract UnicornBreeding is UnicornAccessControl {
         return _createUnicorn(msg.sender);
     }
 
-    function createPresaleUnicorn(address _owner) public payable onlyManager whenPaused returns(uint256) {
-        require(gen0PresaleCount < gen0PresaleLimit);
-        require(msg.value == unicornManagement.oraclizeFee());
-        gen0PresaleCount = gen0PresaleCount.add(1);
-        return _createUnicorn(_owner == address(0) ? msg.sender : _owner);
-    }
-
-
-    function createManyPresale(uint  _count) public payable onlyManager whenPaused returns(bool) {
+    function createPresaleUnicorns(uint _count, address _owner) public payable onlyManager whenPaused returns(bool) {
         require(gen0PresaleCount.add(_count) <= gen0PresaleLimit);
-
-        uint256 newUnicornId = 0;
-        for (uint i=0; i < _count; i+=1){
-            newUnicornId = unicornToken.createUnicorn(msg.sender);
+        uint256 newUnicornId;
+        address owner = _owner == address(0) ? msg.sender : _owner;
+        for (uint i = 0; i < _count; i++){
+            newUnicornId = unicornToken.createUnicorn(owner);
             blackBox.createGen0(newUnicornId);
-            emit CreateUnicorn(msg.sender, newUnicornId, 0, 0);
+            emit CreateUnicorn(owner, newUnicornId, 0, 0);
             gen0Count = gen0Count.add(1);
             gen0PresaleCount = gen0PresaleCount.add(1);
         }
-
         return true;
     }
-
 
     function _createUnicorn(address _owner) private returns(uint256) {
         require(gen0Count < gen0Limit);
