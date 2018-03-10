@@ -1677,7 +1677,7 @@ contract UnicornTokenInterface {
 
     //specific
     function createUnicorn(address _owner) external returns (uint);
-    function burnUnicorn(uint256 _unicornId) external;
+//    function burnUnicorn(uint256 _unicornId) external;
     function getGen(uint _unicornId) external view returns (bytes);
     function setGene(uint _unicornId, bytes _gene) external;
     function updateGene(uint _unicornId, bytes _gene) external;
@@ -1925,15 +1925,15 @@ contract UnicornBase is UnicornAccessControl {
     }
 
     //specific
-    function burnUnicorn(uint256 _unicornId) onlyOwnerOf(_unicornId) public  {
-        if (approvedFor(_unicornId) != 0) {
-            clearApproval(msg.sender, _unicornId);
-        }
-        removeUnicorn(msg.sender, _unicornId);
-        //destroy unicorn data
-        delete unicorns[_unicornId];
-        emit Transfer(msg.sender, 0x0, _unicornId);
-    }
+//    function burnUnicorn(uint256 _unicornId) onlyOwnerOf(_unicornId) public  {
+//        if (approvedFor(_unicornId) != 0) {
+//            clearApproval(msg.sender, _unicornId);
+//        }
+//        removeUnicorn(msg.sender, _unicornId);
+//        //destroy unicorn data
+//        delete unicorns[_unicornId];
+//        emit Transfer(msg.sender, 0x0, _unicornId);
+//    }
 
 
     function createUnicorn(address _owner) onlyBreeding external returns (uint) {
