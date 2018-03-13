@@ -1459,6 +1459,8 @@ contract BlackBoxController is BlackBoxAccessControl, usingOraclize  {
 
     string genCoreUrl = "BAdL0Wo6ujCMz/QLJL5daj57R00OusTUuymK+XEVmGI8BgjdpUbTYZCLBv0D524Oe9306mZJO6VOMBGjgrni8uGfa6X+Ckc3bsJghmv3ae5vlIpB6Gj0WoljUv0n8wZHENG+zWZsrzNPwc60SVHmmGCgH4fqmtMYPSjIJDMzQhZ2JpG43qrceNyghrB9cMUCvatwOdDUhOou5WvhGGboNvY1HIqtgoenv4FtyUCANt7VLwHkGg==";
     string gen0Url = "BDymKBpAwjmJ4wwB1OGkJQnn3puTj6dEYUYJ6Ej1yzl6Wh16elvSBKA29Ml23BBKFowk6jfFsR2YWqhdH9kiusY/RZqsdNDH/NstdjKhx36qvmy47q184mzdQaClLbde9LNEw+TC5ya19SVpLj9EBoyEvUf7JIBAbM5mm+gn2iUi/MMCMW3S3hGTSNeH6yPtEFXAni8nIcx5g5YXp3Hw6jstA1IVaHiw2xuY1WiSZJA1fnahBl9mZ6o=";
+        //BAAOcBX5QYJ1rb+NZ72ypcORm+OwcsK137uEWo1AyQQBBL5qBQVeWWOj5aZ/yXsAMsPDDGkNAtlSddKFr/hGpKY1428noTNBdb+smG3kw4BM5uQUx3JHAWhbEUElQn4ZjVhp86FtWrZB69KT5BmrvN3y9IW3wyJXCDL4s9PbbkN5wLn501FpLcV1A47Y
+
 
     string Gen0Query1 = '\n{"unicorn_blockchain_id":';
     string Gen0Query2 = ',"type":';
