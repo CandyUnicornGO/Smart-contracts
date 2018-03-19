@@ -1501,8 +1501,11 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
     uint public queueSize = 0;
     uint gasLimit = 400000;
 
-    string geneCoreUrl = "BAdL0Wo6ujCMz/QLJL5daj57R00OusTUuymK+XEVmGI8BgjdpUbTYZCLBv0D524Oe9306mZJO6VOMBGjgrni8uGfa6X+Ckc3bsJghmv3ae5vlIpB6Gj0WoljUv0n8wZHENG+zWZsrzNPwc60SVHmmGCgH4fqmtMYPSjIJDMzQhZ2JpG43qrceNyghrB9cMUCvatwOdDUhOou5WvhGGboNvY1HIqtgoenv4FtyUCANt7VLwHkGg==";
-    string gene0Url = "BDymKBpAwjmJ4wwB1OGkJQnn3puTj6dEYUYJ6Ej1yzl6Wh16elvSBKA29Ml23BBKFowk6jfFsR2YWqhdH9kiusY/RZqsdNDH/NstdjKhx36qvmy47q184mzdQaClLbde9LNEw+TC5ya19SVpLj9EBoyEvUf7JIBAbM5mm+gn2iUi/MMCMW3S3hGTSNeH6yPtEFXAni8nIcx5g5YXp3Hw6jstA1IVaHiw2xuY1WiSZJA1fnahBl9mZ6o=";
+    //old
+    //    string geneCoreUrl = "BAdL0Wo6ujCMz/QLJL5daj57R00OusTUuymK+XEVmGI8BgjdpUbTYZCLBv0D524Oe9306mZJO6VOMBGjgrni8uGfa6X+Ckc3bsJghmv3ae5vlIpB6Gj0WoljUv0n8wZHENG+zWZsrzNPwc60SVHmmGCgH4fqmtMYPSjIJDMzQhZ2JpG43qrceNyghrB9cMUCvatwOdDUhOou5WvhGGboNvY1HIqtgoenv4FtyUCANt7VLwHkGg==";
+    //    string gene0Url = "BDymKBpAwjmJ4wwB1OGkJQnn3puTj6dEYUYJ6Ej1yzl6Wh16elvSBKA29Ml23BBKFowk6jfFsR2YWqhdH9kiusY/RZqsdNDH/NstdjKhx36qvmy47q184mzdQaClLbde9LNEw+TC5ya19SVpLj9EBoyEvUf7JIBAbM5mm+gn2iUi/MMCMW3S3hGTSNeH6yPtEFXAni8nIcx5g5YXp3Hw6jstA1IVaHiw2xuY1WiSZJA1fnahBl9mZ6o=";
+    string geneCoreUrl = "BMbhap0QwplxMe+ggNYE2wt0ucfSu1pkRFfFmein8qZhm9s0jj09QqUZnbkA+iTGJfUxiM/8sKhoL2CzeMz6b9Wdg0Zf4WwJ2eOovDIelOJ7ltoki4yJMYzDKi/OFWbmNkFwNphMpKhnPblmRvbqR0tNKSn+tsdY7Y/MgfPAq76CpkeU50iVS9MkbhegpsYcBMGHSsfxtLH/biZIwKfMhTn1jtKaPKjw5qe2fNaGOd+lf2ET/33pa4s=";
+    string gene0Url = "BO4Zz8nhdzZFxsVBMBTGWXe7Gk9ARth7sylbx2OR1qpVjdpRZNuwy7S8unuy4rgHLvircYBMkjQuFC6zadlWyK1TxHJ43NXx2NgSc9Pe5zwuOvfjEcudqzWxCGHn1fl7QgURJQeMRty0cCPVvvVt/TqbS0h2TQ/06SKKtjHLJCP1IPhi/9xikQcO13/pyhYsKlKwCgte4vlQalrxAcAn8NiCDG+afF+wXr7pZM+zHGanG1EVv8NoeB2+j1JV";
 
     string Gen0Query1 = '\n{"unicorn_blockchain_id":';
     string Gen0Query2 = ',"type":';
@@ -1533,12 +1536,14 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
 
     //
     function __callback(bytes32 hash, string result) public {
-        require(validIds[hash] > 0);
-        require(msg.sender == oraclize_cbAddress());
-
+        if (useOwnOracle) {
+            require(msg.sender == ownOracle);
+        } else {
+            require(validIds[hash] > 0);
+            require(msg.sender == oraclize_cbAddress());
+        }
         bytes memory gene = bytes(result);
         uint unicornId = validIds[hash] - 1;
-//        UnicornTokenInterface unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
         unicornToken.setGene(unicornId, gene);
         //        logRes(result);
 
@@ -1554,15 +1559,19 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
 
 
     function geneCore(uint _childUnicornId, uint _parent1UnicornId, uint _parent2UnicornId) onlyBreeding public payable {
-        if (oraclize_getPrice("URL") > address(this).balance) {
-            revert();
+        bytes32  queryId;
+        if (useOwnOracle) {
+            queryId = keccak256(_childUnicornId);
         } else {
+
+            if (oraclize_getPrice("URL") > address(this).balance) {
+                revert();
+            }
             string memory query = strConcat(geneCoreQuery1, uint2str(_parent1UnicornId),
                 '},{"unicorn_blockchain_id":', uint2str(_parent2UnicornId), '}],"parent_idx": 1,"unicorn_blockchain_id":');
 
             query = strConcat(query, uint2str(_childUnicornId), '}');
-
-            bytes32 queryId = oraclize_query("URL", geneCoreUrl, query, gasLimit);
+            queryId = oraclize_query("URL", geneCoreUrl, query, gasLimit);
 
             requests[_childUnicornId] = Request({
                 request: query,
@@ -1570,21 +1579,26 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
                 });
 
             queue[requests[_childUnicornId].queueIndex] = _childUnicornId;
-
-            validIds[queryId] = _childUnicornId + 1; //for require validIds[hash] > 0
-            emit GeneHybritizationRequest(_childUnicornId, _parent1UnicornId, _parent2UnicornId);
         }
+        validIds[queryId] = _childUnicornId + 1; //for require validIds[hash] > 0
+        emit GeneHybritizationRequest(_childUnicornId, _parent1UnicornId, _parent2UnicornId);
+
     }
 
     function createGen0(uint _unicornId) onlyBreeding public payable {
-        if (oraclize_getPrice("URL") > address(this).balance) {
-            revert();
+        bytes32 queryId;
+        if (useOwnOracle) {
+            queryId = keccak256(_unicornId);
         } else {
+
+            if (oraclize_getPrice("URL") > address(this).balance) {
+                revert();
+            }
             //TODO delete _type!
             uint _type = 0;
             string memory query = strConcat(Gen0Query1, uint2str(_unicornId), Gen0Query2, uint2str(_type), Gen0Query3);
 
-            bytes32 queryId = oraclize_query("URL", gene0Url, query, gasLimit);
+            queryId = oraclize_query("URL", gene0Url, query, gasLimit);
 
             requests[_unicornId] = Request({
                 request: query,
@@ -1592,12 +1606,19 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
                 });
 
             queue[requests[_unicornId].queueIndex] = _unicornId;
-
-            validIds[queryId] = _unicornId + 1; //for require validIds[hash] > 0
-            emit Gene0Request(_unicornId);
         }
+        validIds[queryId] = _unicornId + 1; //for require validIds[hash] > 0
+        emit Gene0Request(_unicornId);
+
     }
 
+    function setOwnOracle(address _ownOracle) public onlyOwner {
+        ownOracle = _ownOracle;
+    }
+
+    function setUseOwnOracle(bool _useOwnOracle) public onlyOwner {
+        useOwnOracle = _useOwnOracle;
+    }
 
     function setGasPrice(uint _newPrice) public onlyOwner {
         oraclize_setCustomGasPrice(_newPrice * 1 wei);
@@ -1637,27 +1658,33 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
 
     function geneCoreRetry(uint _unicornId) onlyOwner public payable {
         require(bytes(requests[_unicornId].request).length > 0);
-        if (oraclize_getPrice("URL") > address(this).balance) {
-            revert();
+        bytes32 queryId;
+        if (useOwnOracle) {
+            queryId = keccak256(_unicornId);
         } else {
-            bytes32 queryId = oraclize_query("URL", geneCoreUrl, requests[_unicornId].request, gasLimit);
-
-            validIds[queryId] = _unicornId + 1; //for require validIds[hash] > 0
-            emit GeneHybritizationRequestRetry(_unicornId);
+            if (oraclize_getPrice("URL") > address(this).balance) {
+                revert();
+            }
+            queryId = oraclize_query("URL", geneCoreUrl, requests[_unicornId].request, gasLimit);
         }
+        validIds[queryId] = _unicornId + 1; //for require validIds[hash] > 0
+        emit GeneHybritizationRequestRetry(_unicornId);
     }
 
 
     function createGen0Retry(uint _unicornId) onlyOwner public payable {
         require(bytes(requests[_unicornId].request).length > 0);
-        if (oraclize_getPrice("URL") > address(this).balance) {
-            revert();
+        bytes32 queryId;
+        if (useOwnOracle) {
+            queryId = keccak256(_unicornId);
         } else {
-            bytes32 queryId = oraclize_query("URL", gene0Url, requests[_unicornId].request, gasLimit);
-
-            validIds[queryId] = _unicornId + 1; //for require validIds[hash] > 0
-            emit Gene0RequestRetry(_unicornId);
+            if (oraclize_getPrice("URL") > address(this).balance) {
+                revert();
+            }
+            queryId = oraclize_query("URL", gene0Url, requests[_unicornId].request, gasLimit);
         }
+        validIds[queryId] = _unicornId + 1; //for require validIds[hash] > 0
+        emit Gene0RequestRetry(_unicornId);
     }
 
 }
@@ -1677,7 +1704,7 @@ contract UnicornTokenInterface {
 
     //specific
     function createUnicorn(address _owner) external returns (uint);
-//    function burnUnicorn(uint256 _unicornId) external;
+    //    function burnUnicorn(uint256 _unicornId) external;
     function getGen(uint _unicornId) external view returns (bytes);
     function setGene(uint _unicornId, bytes _gene) external;
     function updateGene(uint _unicornId, bytes _gene) external;
@@ -1925,15 +1952,15 @@ contract UnicornBase is UnicornAccessControl {
     }
 
     //specific
-//    function burnUnicorn(uint256 _unicornId) onlyOwnerOf(_unicornId) public  {
-//        if (approvedFor(_unicornId) != 0) {
-//            clearApproval(msg.sender, _unicornId);
-//        }
-//        removeUnicorn(msg.sender, _unicornId);
-//        //destroy unicorn data
-//        delete unicorns[_unicornId];
-//        emit Transfer(msg.sender, 0x0, _unicornId);
-//    }
+    //    function burnUnicorn(uint256 _unicornId) onlyOwnerOf(_unicornId) public  {
+    //        if (approvedFor(_unicornId) != 0) {
+    //            clearApproval(msg.sender, _unicornId);
+    //        }
+    //        removeUnicorn(msg.sender, _unicornId);
+    //        //destroy unicorn data
+    //        delete unicorns[_unicornId];
+    //        emit Transfer(msg.sender, 0x0, _unicornId);
+    //    }
 
 
     function createUnicorn(address _owner) onlyBreeding external returns (uint) {
@@ -2172,7 +2199,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
         plusFreezingTime(_secondUnicornId);
         uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
-//        BlackBoxInterface blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
+        //        BlackBoxInterface blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
         blackBox.geneCore.value(unicornManagement.oraclizeFee())(newUnicornId, _firstUnicornId, _secondUnicornId);
         emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
         if (hybridizations[_firstUnicornId].price > 0) {
