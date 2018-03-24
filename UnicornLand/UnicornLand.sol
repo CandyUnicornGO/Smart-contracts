@@ -196,7 +196,7 @@ contract CandyLandCrowdsale is CandyLand {
 
     function init() onlyLandManagement whenPaused external {
         userRank = UserRankInterface(landManagement.userRankAddress());
-        megaCandy = MegaCandyInterface(landManagement.mageCandyToken());
+        megaCandy = MegaCandyInterface(landManagement.megaCandyToken());
         candyToken = ERC20(landManagement.candyToken());
     }
 
@@ -226,6 +226,7 @@ contract CandyLandCrowdsale is CandyLand {
             }
 
         } else {
+            //TODO Закупить все сначала в текущем ранге
             uint userRankIndex = userRank.getUserRank(msg.sender);
             uint rankPrice = userRank.getRankPriceEth(userRankIndex+1);
             require(msg.value >= landPriceWei.add(rankPrice));

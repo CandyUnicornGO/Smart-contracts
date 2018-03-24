@@ -175,7 +175,7 @@ contract LandManagement {
 
     }
 
-    //TODO проверить почему эксепшен
+
     function runInit() external onlyOwner whenPaused {
         for(uint i = 0; i < initList.length; i++) {
             LandInit(initList[i]).init();
@@ -233,7 +233,7 @@ contract LandManagementInterface {
     function walletAddress() external view returns (address);
     function unicornTokenAddress() external view returns (address);
     function candyToken() external view returns (address);
-    function mageCandyToken() external view returns (address);
+    function megaCandyToken() external view returns (address);
     function userRankAddress() external view returns (address);
     function candyLandAddress() external view returns (address);
 
