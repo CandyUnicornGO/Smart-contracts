@@ -92,11 +92,16 @@ contract LandManagement {
     address public communityAddress;
     address public walletAddress;
     address public candyToken;
-    address public candyPowerToken;
+    address public megaCandyToken;
     address public dividendManagerAddress; //onlyCommunity
     address public unicornTokenAddress; //onlyOwner
+    address public userRankAddress;
+    address public candyLandAddress;
 
     mapping(address => bool) unicornContracts;//address
+
+    event AddUnicornContract(address indexed _unicornContractAddress);
+    event DelUnicornContract(address indexed _unicornContractAddress);
 
     modifier onlyOwner() {
         require(msg.sender == ownerAddress);
@@ -134,9 +139,9 @@ contract LandManagement {
         communityAddress = unicornManagement.communityAddress();
         walletAddress = unicornManagement.walletAddress();
         candyToken = unicornManagement.candyToken();
-        candyPowerToken = unicornManagement.candyPowerToken();
-        dividendManagerAddress = unicornManagement.candyPowerToken();
-        unicornTokenAddress = unicornManagement.candyPowerToken();
+        megaCandyToken = unicornManagement.candyPowerToken();
+        dividendManagerAddress = unicornManagement.dividendManagerAddress();
+        unicornTokenAddress = unicornManagement.unicornTokenAddress();
     }
 
 
@@ -170,6 +175,7 @@ contract LandManagement {
 
     }
 
+    //TODO проверить почему эксепшен
     function runInit() external onlyOwner whenPaused {
         for(uint i = 0; i < initList.length; i++) {
             LandInit(initList[i]).init();
@@ -186,7 +192,7 @@ contract LandManagement {
     function delUnicornContract(address _unicornContractAddress) external onlyOwner {
         require(unicornContracts[_unicornContractAddress]);
         unicornContracts[_unicornContractAddress] = false;
-        emit DelTournament(_unicornContractAddress);
+        emit DelUnicornContract(_unicornContractAddress);
     }
 
     function isUnicornContract(address _unicornContractAddress) external view returns (bool) {
@@ -194,7 +200,19 @@ contract LandManagement {
     }
 
 
-    function paused() public returns(bool) {
+    //TODO lock ???
+    function setUserRank(address _userRankAddress) external onlyOwner whenPaused {
+        require(_userRankAddress != address(0));
+        userRankAddress = _userRankAddress;
+    }
+
+    function setCandyLand(address _candyLandAddress) external onlyOwner whenPaused {
+        require(_candyLandAddress != address(0));
+        candyLandAddress = _candyLandAddress;
+    }
+
+
+    function paused() public view returns(bool) {
         return unicornManagement.paused();
     }
 
@@ -215,7 +233,9 @@ contract LandManagementInterface {
     function walletAddress() external view returns (address);
     function unicornTokenAddress() external view returns (address);
     function candyToken() external view returns (address);
-    function candyPowerToken() external view returns (address);
+    function mageCandyToken() external view returns (address);
+    function userRankAddress() external view returns (address);
+    function candyLandAddress() external view returns (address);
 
     function isUnicornContract(address _unicornContractAddress) external view returns (bool);
 
@@ -259,7 +279,7 @@ contract LandAccessControl {
         _;
     }
 
-    modifier onlyManagement() {
+    modifier onlyLandManagement() {
         require(msg.sender == address(landManagement));
         _;
     }
@@ -283,6 +303,8 @@ contract StandardToken is ERC20 {
 
     uint256 totalSupply_;
 
+    event Burn(address indexed burner, uint256 value);
+
     /**
     * @dev total number of tokens in existence
     */
@@ -302,7 +324,7 @@ contract StandardToken is ERC20 {
         // SafeMath.sub will throw if there is not enough balance.
         balances[msg.sender] = balances[msg.sender].sub(_value);
         balances[_to] = balances[_to].add(_value);
-        Transfer(msg.sender, _to, _value);
+        emit Transfer(msg.sender, _to, _value);
         return true;
     }
 
@@ -329,7 +351,7 @@ contract StandardToken is ERC20 {
         balances[_from] = balances[_from].sub(_value);
         balances[_to] = balances[_to].add(_value);
         allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
-        Transfer(_from, _to, _value);
+        emit Transfer(_from, _to, _value);
         return true;
     }
 
@@ -345,7 +367,7 @@ contract StandardToken is ERC20 {
      */
     function approve(address _spender, uint256 _value) public returns (bool) {
         allowed[msg.sender][_spender] = _value;
-        Approval(msg.sender, _spender, _value);
+        emit Approval(msg.sender, _spender, _value);
         return true;
     }
 
@@ -371,7 +393,7 @@ contract StandardToken is ERC20 {
      */
     function increaseApproval(address _spender, uint _addedValue) public returns (bool) {
         allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_addedValue);
-        Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+        emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
         return true;
     }
 
@@ -392,10 +414,20 @@ contract StandardToken is ERC20 {
         } else {
             allowed[msg.sender][_spender] = oldValue.sub(_subtractedValue);
         }
-        Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+        emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
         return true;
     }
 
+
+    function burn(uint256 _value) public {
+        require(_value <= balances[msg.sender]);
+
+        address burner = msg.sender;
+        balances[burner] = balances[burner].sub(_value);
+        totalSupply_ = totalSupply_.sub(_value);
+        emit Burn(burner, _value);
+        emit Transfer(burner, address(0), _value);
+    }
 }
 
 
@@ -405,18 +437,16 @@ contract MagaCandy is StandardToken, LandAccessControl {
     string public constant symbol = "MCC"; // solium-disable-line uppercase
     uint8 public constant decimals = 18; // solium-disable-line uppercase
 
+    event Mint(address indexed _to, uint  _amount);
 
-    mapping(address => bool) UnicornContracts;
 
     //uint256 public constant INITIAL_SUPPLY = 1000000000 * (10 ** uint256(decimals));
 
-    /**
-     * @dev Constructor that gives msg.sender all of existing tokens.
-     */
-    function MagaCandy() public {
-        //totalSupply_ = INITIAL_SUPPLY;
-        //balances[msg.sender] = INITIAL_SUPPLY;
-        //Transfer(0x0, msg.sender, INITIAL_SUPPLY);
+
+    function MagaCandy(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
+    }
+
+    function init() onlyLandManagement whenPaused external {
     }
 
     function transferFromSystem(address _from, address _to, uint256 _value) onlyUnicornContract public returns (bool) {
@@ -425,85 +455,160 @@ contract MagaCandy is StandardToken, LandAccessControl {
 
         balances[_from] = balances[_from].sub(_value);
         balances[_to] = balances[_to].add(_value);
-        Transfer(_from, _to, _value);
+        emit Transfer(_from, _to, _value);
         return true;
     }
+
+
+    function burnFromSystem(address _from, uint256 _value) onlyUnicornContract public returns (bool) {
+        require(_value <= balances[_from]);
+
+        balances[_from] = balances[_from].sub(_value);
+        totalSupply_ = totalSupply_.sub(_value);
+        //contract address here
+        emit Burn(msg.sender, _value);
+        emit Transfer(_from, address(0), _value);
+    }
+
 
 
     function mint(address _to, uint256 _amount) onlyUnicornContract public returns (bool) {
         totalSupply_ = totalSupply_.add(_amount);
         balances[_to] = balances[_to].add(_amount);
-        Mint(_to, _amount);
-        Transfer(address(0), _to, _amount);
+        emit Mint(_to, _amount);
+        emit Transfer(address(0), _to, _amount);
         return true;
     }
 
 }
 
-
+//TODO presale
+//TODO buy with eth
+//TODO ?? burn
 contract UserRank is LandAccessControl {
+    using SafeMath for uint256;
 
     ERC20 public candyToken;
 
     struct Rank{
         uint landLimit;
-        uint voteRate;
-        uint price;
+        uint priceCandy;
+        uint priceEth;
         string title;
     }
 
-    //Rank[] public ranks;
+
     mapping (uint => Rank) public ranks;
     uint public ranksCount = 0;
-    //TODO list of all ranks
+
     mapping (address => uint) public userRanks;
 
 
-
-
-    function UserRank() public {
+    function UserRank(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
         candyToken = ERC20(landManagement.candyToken());
     }
 
-
-    function buyRank(uint _index) public {
-        //only 1 rank per step
-        require(userRanks[msg.sender]+1 == _index);
-        require(candyToken.transferFrom(msg.sender, this, ranks[_index].price));
-        userRanks[msg.sender] = _index;
-
+    function init() onlyLandManagement whenPaused external {
     }
 
 
-    function addRank(uint _index, uint _landLimit, uint _voteRate, uint _price, string _title) onlyOwner public  {
-        Rank storage r = ranks[_index];
+    function addRank(uint _landLimit, uint _priceCandy, uint _priceEth, string _title) onlyOwner public  {
+        ranksCount++;
+        Rank storage r = ranks[ranksCount];
         r.landLimit = _landLimit;
-        r.voteRate = _voteRate;
-        r.price = _price;
+        r.priceCandy = _priceCandy;
+        r.priceEth = _priceEth;
         r.title = _title;
     }
 
 
-    function getRankPrice(uint _index) public view returns (uint) {
-        return ranks[_index].price;
+    function editRank(uint _index, uint _priceCandy, uint _priceEth) onlyOwner public  {
+        require(_index <= ranksCount);
+        Rank storage r = ranks[_index];
+        r.priceCandy = _priceCandy;
+        r.priceEth = _priceEth;
+    }
+
+
+    function buyNextRank() public {
+        uint _index = userRanks[msg.sender] + 1;
+        require(_index <= ranksCount);
+
+        require(candyToken.transferFrom(msg.sender, this, ranks[_index].priceCandy));
+        userRanks[msg.sender] = _index;
+    }
+
+
+    function buyRank(uint _index) public {
+        require(_index <= ranksCount);
+        require(userRanks[msg.sender] < _index);
+
+        uint fullPrice = _getPrice(userRanks[msg.sender],_index);
+
+        require(candyToken.transferFrom(msg.sender, this, fullPrice));
+        userRanks[msg.sender] = _index;
+    }
+
+
+    //TODO ?? стремная лазейка
+    function getNextRank(address _user) onlyUnicornContract public returns (uint) {
+        uint _index = userRanks[_user] + 1;
+        require(_index <= ranksCount);
+        userRanks[_user] = _index;
+        return _index;
+    }
+
+
+    function _getPrice(uint _userRank, uint _index) private view returns (uint) {
+        uint fullPrice = 0;
+
+        for(uint i = _userRank+1; i <= _index; i++)
+        {
+            fullPrice = fullPrice.add(ranks[i].priceCandy);
+        }
+
+        return fullPrice;
+    }
+
+
+    function getIndividualPrice(address _user, uint _index) public view returns (uint) {
+        require(_index <= ranksCount);
+        require(userRanks[_user] < _index);
+
+        return _getPrice(userRanks[_user],_index);
+    }
+
+
+    function getRankPriceCandy(uint _index) public view returns (uint) {
+        return ranks[_index].priceCandy;
+    }
+
+
+    function getRankPriceEth(uint _index) public view returns (uint) {
+        return ranks[_index].priceEth;
     }
 
     function getRankLandLimit(uint _index) public view returns (uint) {
         return ranks[_index].landLimit;
     }
 
-    function getRankVoteRate(uint _index) public view returns (uint) {
-        return ranks[_index].voteRate;
+
+    function getRankTitle(uint _index) public view returns (string) {
+        return ranks[_index].title;
     }
 
-    function getRankTitle(uint _index) public view returns (uint) {
-        return ranks[_index].title;
+    function getUserRank(address _user) public view returns (uint) {
+        return userRanks[_user];
+    }
+
+    function getUserLandLimit(address _user) public view returns (uint) {
+        return ranks[userRanks[_user]].landLimit;
     }
 
 
     function withdrawTokens() onlyManager public {
         require(candyToken.balanceOf(this) > 0);
-        candyToken.transfer(unicornManagement.walletAddress(), candyToken.balanceOf(this));
+        candyToken.transfer(landManagement.walletAddress(), candyToken.balanceOf(this));
     }
 
 

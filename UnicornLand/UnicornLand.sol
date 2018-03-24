@@ -1,272 +1,268 @@
-pragma solidity ^0.4.21;
-
-library SafeMath {
-
-    /**
-    * @dev Multiplies two numbers, throws on overflow.
-    */
-    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-        if (a == 0) {
-            return 0;
-        }
-        uint256 c = a * b;
-        assert(c / a == b);
-        return c;
-    }
-
-    /**
-    * @dev Integer division of two numbers, truncating the quotient.
-    */
-    function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        // assert(b > 0); // Solidity automatically throws when dividing by 0
-        uint256 c = a / b;
-        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-        return c;
-    }
-
-    /**
-    * @dev Subtracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
-    */
-    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-        assert(b <= a);
-        return a - b;
-    }
-
-    /**
-    * @dev Adds two numbers, throws on overflow.
-    */
-    function add(uint256 a, uint256 b) internal pure returns (uint256) {
-        uint256 c = a + b;
-        assert(c >= a);
-        return c;
-    }
-}
-
- 
-
-
-contract UnicornLandTokenInterface {
-    event Transfer(address indexed _from, address indexed _to, uint256 _tokenId);
-    event Approval(address indexed _owner, address indexed _approved, uint256 _tokenId);
-
-    function balanceOf(address _owner) public view returns (uint256 _balance);
-    function ownerOf(uint256 _tokenId) public view returns (address _owner);
-    function transfer(address _to, uint256 _tokenId) public;
-    function approve(address _to, uint256 _tokenId) public;
-    function takeOwnership(uint256 _tokenId) public;
+contract UserRankInterface  {
+    function buyNextRank() public;
+    function buyRank(uint _index) public;
+    function getIndividualPrice(address _user, uint _index) public view returns (uint);
+    function getRankPriceEth(uint _index) public view returns (uint);
+    function getRankPriceCandy(uint _index) public view returns (uint);
+    function getRankLandLimit(uint _index) public view returns (uint);
+    function getRankTitle(uint _index) public view returns (string);
+    function getUserRank(address _user) public view returns (uint);
+    function getUserLandLimit(address _user) public view returns (uint);
+    function ranksCount() public view returns (uint);
+    function getNextRank(address _user)  public returns (uint);
 }
 
 
-contract UnicornLandToken is UnicornLandTokenInterface {
+
+
+contract MegaCandyInterface is ERC20 {
+    function transferFromSystem(address _from, address _to, uint256 _value) public returns (bool);
+    function burnFromSystem(address _from, uint256 _value) public returns (bool);
+    function mint(address _to, uint256 _amount) public returns (bool);
+}
+
+
+contract CandyLand is ERC20, LandAccessControl {
     using SafeMath for uint256;
 
-    // Total amount of tokens
-    uint256 private totalTokens;
+    UserRankInterface public userRank;
+    MegaCandyInterface public megaCandy;
+    ERC20 public candyToken;
 
-    // Mapping from token ID to owner
-    mapping (uint256 => address) private tokenOwner;
-
-    // Mapping from token ID to approved address
-    mapping (uint256 => address) private tokenApprovals;
-
-    // Mapping from owner to list of owned token IDs
-    mapping (address => uint256[]) private ownedTokens;
-
-    // Mapping from token ID to index of the owner tokens list
-    mapping(uint256 => uint256) private ownedTokensIndex;
-
-    /**
-    * @dev Guarantees msg.sender is owner of the given token
-    * @param _tokenId uint256 ID of the token to validate its ownership belongs to msg.sender
-    */
-    modifier onlyOwnerOf(uint256 _tokenId) {
-        require(ownerOf(_tokenId) == msg.sender);
-        _;
+    struct Garden {
+        uint count;
+        uint endTime;
+        address owner;
     }
 
-    /**
-    * @dev Gets the total amount of tokens stored by the contract
-    * @return uint256 representing the total amount of tokens
-    */
+
+    string public constant name = "CandyLand";
+    string public constant symbol = "CLC";
+    uint8 public constant decimals = 0;
+
+    uint256 totalSupply_;
+    uint256 public constant MAX_SUPPLY = 30000;
+
+    uint public plantedTime = 1 hours;
+    uint public plantedRate = 1;
+    uint public priceRate = 1 ether;
+
+    mapping(address => uint256) balances;
+    mapping (address => mapping (address => uint256)) internal allowed;
+    mapping(address => uint256) planted;
+
+
+    mapping(uint => Garden) gardens;
+    uint gardenId = 0;
+
+
+    event Mint(address indexed to, uint256 amount);
+
+
     function totalSupply() public view returns (uint256) {
-        return totalTokens;
+        return totalSupply_;
     }
 
-    /**
-    * @dev Gets the balance of the specified address
-    * @param _owner address to query the balance of
-    * @return uint256 representing the amount owned by the passed address
-    */
-    function balanceOf(address _owner) public view returns (uint256) {
-        return ownedTokens[_owner].length;
-    }
 
-    /**
-    * @dev Gets the list of tokens owned by a given address
-    * @param _owner address to query the tokens of
-    * @return uint256[] representing the list of tokens owned by the passed address
-    */
-    function tokensOf(address _owner) public view returns (uint256[]) {
-        return ownedTokens[_owner];
-    }
-
-    /**
-    * @dev Gets the owner of the specified token ID
-    * @param _tokenId uint256 ID of the token to query the owner of
-    * @return owner address currently marked as the owner of the given token ID
-    */
-    function ownerOf(uint256 _tokenId) public view returns (address) {
-        address owner = tokenOwner[_tokenId];
-        require(owner != address(0));
-        return owner;
-    }
-
-    /**
-     * @dev Gets the approved address to take ownership of a given token ID
-     * @param _tokenId uint256 ID of the token to query the approval of
-     * @return address currently approved to take ownership of the given token ID
-     */
-    function approvedFor(uint256 _tokenId) public view returns (address) {
-        return tokenApprovals[_tokenId];
-    }
-
-    /**
-    * @dev Transfers the ownership of a given token ID to another address
-    * @param _to address to receive the ownership of the given token ID
-    * @param _tokenId uint256 ID of the token to be transferred
-    */
-    function transfer(address _to, uint256 _tokenId) public onlyOwnerOf(_tokenId) {
-        clearApprovalAndTransfer(msg.sender, _to, _tokenId);
-    }
-
-    /**
-    * @dev Approves another address to claim for the ownership of the given token ID
-    * @param _to address to be approved for the given token ID
-    * @param _tokenId uint256 ID of the token to be approved
-    */
-    function approve(address _to, uint256 _tokenId) public onlyOwnerOf(_tokenId) {
-        address owner = ownerOf(_tokenId);
-        require(_to != owner);
-        if (approvedFor(_tokenId) != 0 || _to != 0) {
-            tokenApprovals[_tokenId] = _to;
-            Approval(owner, _to, _tokenId);
-        }
-    }
-
-    /**
-    * @dev Claims the ownership of a given token ID
-    * @param _tokenId uint256 ID of the token being claimed by the msg.sender
-    */
-    function takeOwnership(uint256 _tokenId) public {
-        require(isApprovedFor(msg.sender, _tokenId));
-        clearApprovalAndTransfer(ownerOf(_tokenId), msg.sender, _tokenId);
-    }
-
-    /**
-    * @dev Mint token function
-    * @param _to The address that will own the minted token
-    * @param _tokenId uint256 ID of the token to be minted by the msg.sender
-    */
-    function _mint(address _to, uint256 _tokenId) internal {
+    function transfer(address _to, uint256 _value) public returns (bool) {
         require(_to != address(0));
-        addToken(_to, _tokenId);
-        Transfer(0x0, _to, _tokenId);
+        require(_value <= balances[msg.sender]);
+        require(balances[_to].add(_value) <= userRank.getUserLandLimit(_to));
+
+        // SafeMath.sub will throw if there is not enough balance.
+        balances[msg.sender] = balances[msg.sender].sub(_value);
+        balances[_to] = balances[_to].add(_value);
+        emit Transfer(msg.sender, _to, _value);
+        return true;
     }
 
-    /**
-    * @dev Burns a specific token
-    * @param _tokenId uint256 ID of the token being burned by the msg.sender
-    */
-    function _burn(uint256 _tokenId) onlyOwnerOf(_tokenId) internal {
-        if (approvedFor(_tokenId) != 0) {
-            clearApproval(msg.sender, _tokenId);
-        }
-        removeToken(msg.sender, _tokenId);
-        Transfer(msg.sender, 0x0, _tokenId);
+
+    function balanceOf(address _owner) public view returns (uint256 balance) {
+        return balances[_owner];
     }
 
-    /**
-     * @dev Tells whether the msg.sender is approved for the given token ID or not
-     * This function is not private so it can be extended in further implementations like the operatable ERC721
-     * @param _owner address of the owner to query the approval of
-     * @param _tokenId uint256 ID of the token to query the approval of
-     * @return bool whether the msg.sender is approved for the given token ID or not
-     */
-    function isApprovedFor(address _owner, uint256 _tokenId) internal view returns (bool) {
-        return approvedFor(_tokenId) == _owner;
-    }
 
-    /**
-    * @dev Internal function to clear current approval and transfer the ownership of a given token ID
-    * @param _from address which you want to send tokens from
-    * @param _to address which you want to transfer the token to
-    * @param _tokenId uint256 ID of the token to be transferred
-    */
-    function clearApprovalAndTransfer(address _from, address _to, uint256 _tokenId) internal {
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
         require(_to != address(0));
-        require(_to != ownerOf(_tokenId));
-        require(ownerOf(_tokenId) == _from);
+        require(_value <= balances[_from]);
+        require(_value <= allowed[_from][msg.sender]);
+        require(balances[_to].add(_value) <= userRank.getUserLandLimit(_to));
 
-        clearApproval(_from, _tokenId);
-        removeToken(_from, _tokenId);
-        addToken(_to, _tokenId);
-        Transfer(_from, _to, _tokenId);
+        balances[_from] = balances[_from].sub(_value);
+        balances[_to] = balances[_to].add(_value);
+        allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
+        emit Transfer(_from, _to, _value);
+        return true;
     }
 
-    /**
-    * @dev Internal function to clear current approval of a given token ID
-    * @param _tokenId uint256 ID of the token to be transferred
-    */
-    function clearApproval(address _owner, uint256 _tokenId) private {
-        require(ownerOf(_tokenId) == _owner);
-        tokenApprovals[_tokenId] = 0;
-        Approval(_owner, 0, _tokenId);
+
+    function approve(address _spender, uint256 _value) public returns (bool) {
+        allowed[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
+        return true;
     }
 
-    /**
-    * @dev Internal function to add a token ID to the list of a given address
-    * @param _to address representing the new owner of the given token ID
-    * @param _tokenId uint256 ID of the token to be added to the tokens list of the given address
-    */
-    function addToken(address _to, uint256 _tokenId) private {
-        require(tokenOwner[_tokenId] == address(0));
-        tokenOwner[_tokenId] = _to;
-        uint256 length = balanceOf(_to);
-        ownedTokens[_to].push(_tokenId);
-        ownedTokensIndex[_tokenId] = length;
-        totalTokens = totalTokens.add(1);
+
+    function allowance(address _owner, address _spender) public view returns (uint256) {
+        return allowed[_owner][_spender];
     }
 
-    /**
-    * @dev Internal function to remove a token ID from the list of a given address
-    * @param _from address representing the previous owner of the given token ID
-    * @param _tokenId uint256 ID of the token to be removed from the tokens list of the given address
-    */
-    function removeToken(address _from, uint256 _tokenId) private {
-        require(ownerOf(_tokenId) == _from);
 
-        uint256 tokenIndex = ownedTokensIndex[_tokenId];
-        uint256 lastTokenIndex = balanceOf(_from).sub(1);
-        uint256 lastToken = ownedTokens[_from][lastTokenIndex];
-
-        tokenOwner[_tokenId] = 0;
-        ownedTokens[_from][tokenIndex] = lastToken;
-        ownedTokens[_from][lastTokenIndex] = 0;
-        // Note that this will handle single-element arrays. In that case, both tokenIndex and lastTokenIndex are going to
-        // be zero. Then we can make sure that we will remove _tokenId from the ownedTokens list since we are first swapping
-        // the lastToken to the first position, and then dropping the element placed in the last position of the list
-
-        ownedTokens[_from].length--;
-        ownedTokensIndex[_tokenId] = 0;
-        ownedTokensIndex[lastToken] = tokenIndex;
-        totalTokens = totalTokens.sub(1);
+    function increaseApproval(address _spender, uint _addedValue) public returns (bool) {
+        allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_addedValue);
+        emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+        return true;
     }
+
+
+    function decreaseApproval(address _spender, uint _subtractedValue) public returns (bool) {
+        uint oldValue = allowed[msg.sender][_spender];
+        if (_subtractedValue > oldValue) {
+            allowed[msg.sender][_spender] = 0;
+        } else {
+            allowed[msg.sender][_spender] = oldValue.sub(_subtractedValue);
+        }
+        emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+        return true;
+    }
+
+
+
+
+    //TODO ??
+    function transferFromSystem(address _from, address _to, uint256 _value) onlyUnicornContract public returns (bool) {
+        require(_to != address(0));
+        require(_value <= balances[_from]);
+
+        balances[_from] = balances[_from].sub(_value);
+        balances[_to] = balances[_to].add(_value);
+        emit Transfer(_from, _to, _value);
+        return true;
+    }
+
+
+    function _mint(address _to, uint256 _amount) internal returns (bool) {
+        require(totalSupply_.add(_amount) <= MAX_SUPPLY);
+        require(balances[_to].add(_amount) <= userRank.getUserLandLimit(_to));
+        totalSupply_ = totalSupply_.add(_amount);
+        balances[_to] = balances[_to].add(_amount);
+        emit Mint(_to, _amount);
+        emit Transfer(address(0), _to, _amount);
+        return true;
+    }
+
+
+
+
+    function makePlant(uint _count) public {
+        require(_count <= balances[msg.sender].sub(planted[msg.sender]));
+        //require(candyToken.transferFrom(msg.sender, this, _count.mul(priceRate)));
+
+        gardens[++gardenId] = Garden({
+            count: _count,
+            endTime: now + plantedTime,
+            owner: msg.sender
+            });
+
+        planted[msg.sender] = planted[msg.sender].add(_count);
+    }
+
+
+    function getCrop(uint _gardenId) public {
+        require(msg.sender == gardens[_gardenId].owner);
+        require(gardens[_gardenId].endTime >= now);
+
+        megaCandy.mint(msg.sender, gardens[_gardenId].count.mul(plantedRate));
+
+        planted[msg.sender] = planted[msg.sender].sub(gardens[_gardenId].count);
+        delete gardens[_gardenId];
+    }
+
+
 }
 
 
-contract UnicornLandController is UnicornLandToken {
+//TODO stop eth sale
+//todo buy land with titul
+//TODO presale
+contract CandyLandCrowdsale is CandyLand {
 
-    function UnicornLandController(){
+    uint public landPriceWei = 10000000000000000;
+
+
+    function CandyLandCrowdsale(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
+    }
+
+
+    function init() onlyLandManagement whenPaused external {
+        userRank = UserRankInterface(landManagement.userRankAddress());
+        megaCandy = MegaCandyInterface(landManagement.mageCandyToken());
+        candyToken = ERC20(landManagement.candyToken());
+    }
+
+
+    function () public payable {
+        buyLandForEth();
+    }
+
+
+    //TODO check MAX_SUPPLY in loop
+    function buyLandForEth() public payable {
+        require(totalSupply_ < MAX_SUPPLY);
+        require(msg.value >= landPriceWei);
+
+        uint weiAmount = msg.value;
+        uint landCount = weiAmount.div(landPriceWei);
+
+
+        if (landCount <= userRank.getUserLandLimit(msg.sender).sub(balances[msg.sender])) {
+            _mint(msg.sender,landCount);
+
+            uint _diff =  weiAmount % landPriceWei;
+
+            if (_diff > 0) {
+                msg.sender.transfer(_diff);
+                //weiAmount = weiAmount.sub(_diff);
+            }
+
+        } else {
+            uint userRankIndex = userRank.getUserRank(msg.sender);
+            uint rankPrice = userRank.getRankPriceEth(userRankIndex+1);
+            require(msg.value >= landPriceWei.add(rankPrice));
+
+            for(uint i = userRankIndex; i <= userRank.ranksCount() &&
+            weiAmount >= landPriceWei.add(userRank.getRankPriceEth(i+1)); i++)
+            {
+                userRankIndex = userRank.getNextRank(msg.sender);
+                rankPrice = userRank.getRankPriceEth(userRankIndex);
+                weiAmount = weiAmount.sub(rankPrice);
+
+                landCount = weiAmount.div(landPriceWei);
+
+                uint userLimit = userRank.getUserLandLimit(msg.sender).sub(balances[msg.sender]);
+                if (landCount <= userLimit) {
+                    _mint(msg.sender,landCount);
+                    weiAmount = weiAmount.sub(landCount.mul(landPriceWei));
+                    break;
+                } else {
+                    _mint(msg.sender,userLimit);
+                    weiAmount = weiAmount.sub(userLimit.mul(landPriceWei));
+                }
+
+            }
+
+            if (weiAmount > 0) {
+                msg.sender.transfer(weiAmount);
+            }
+
+
+        }
+
+
 
     }
+
+
+
 }
+

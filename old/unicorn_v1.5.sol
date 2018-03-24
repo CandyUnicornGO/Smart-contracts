@@ -1477,6 +1477,13 @@ contract ERC20 {
 }
 
 
+contract megaCandyInterface is ERC20 {
+    function transferFromSystem(address _from, address _to, uint256 _value) public returns (bool);
+    function burnFromSystem(address _from, uint256 _value) public returns (bool);
+    function mint(address _to, uint256 _amount) public returns (bool);
+}
+
+
 contract UnicornBreedingInterface {
     function deleteOffer(uint _unicornId) external;
     function deleteHybridization(uint _unicornId) external;
@@ -2131,7 +2138,7 @@ contract UnicornBreeding is UnicornAccessControl {
     event UnicornSold(uint256 indexed unicornId);
 
     ERC20 public candyToken;
-    ERC20 public candyPowerToken;
+    megaCandyInterface public megaCandyToken;
 
     //counter for gen0
     uint public gen0Limit = 30000;
@@ -2168,7 +2175,7 @@ contract UnicornBreeding is UnicornAccessControl {
     function init() onlyManagement whenPaused external {
         unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
         blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
-        candyPowerToken = ERC20(unicornManagement.candyPowerToken());
+        megaCandyToken = megaCandyInterface(unicornManagement.candyPowerToken());
     }
 
     function makeHybridization(uint _unicornId, uint _price) public {
@@ -2280,15 +2287,17 @@ contract UnicornBreeding is UnicornAccessControl {
         unicornToken.plusTourFreezingTime(_unicornId);
     }
 
-    //change freezing time for candy
+    //change freezing time for megacandy
     function minusFreezingTime(uint _unicornId) public {
-        require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subFreezingPrice()));
+        //require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subFreezingPrice()));
+        require(megaCandyToken.burnFromSystem(msg.sender, unicornManagement.subFreezingPrice()));
         unicornToken.minusFreezingTime(_unicornId, unicornManagement.subFreezingTime());
     }
 
-    //change tour freezing time for candy
+    //change tour freezing time for megacandy
     function minusTourFreezingTime(uint _unicornId) public {
-        require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subTourFreezingPrice()));
+        //require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subTourFreezingPrice()));
+        require(megaCandyToken.burnFromSystem(msg.sender, unicornManagement.subTourFreezingPrice()));
         unicornToken.minusTourFreezingTime(_unicornId, unicornManagement.subTourFreezingTime());
     }
 
@@ -2311,13 +2320,13 @@ contract UnicornBreeding is UnicornAccessControl {
 
 
     function withdrawTokens() onlyManager public {
-        require(candyToken.balanceOf(this) > 0 || candyPowerToken.balanceOf(this) > 0);
-        if (candyToken.balanceOf(this) > 0) {
+        require(candyToken.balanceOf(this) > 0/* || candyPowerToken.balanceOf(this) > 0*/);
+//        if (candyToken.balanceOf(this) > 0) {
             candyToken.transfer(unicornManagement.walletAddress(), candyToken.balanceOf(this));
-        }
-        if (candyPowerToken.balanceOf(this) > 0) {
+//        }
+        /*if (candyPowerToken.balanceOf(this) > 0) {
             candyPowerToken.transfer(unicornManagement.walletAddress(), candyPowerToken.balanceOf(this));
-        }
+        }*/
     }
 
 
