@@ -2290,7 +2290,7 @@ contract UnicornBreeding is UnicornAccessControl {
     //change freezing time for megacandy
     function minusFreezingTime(uint _unicornId) public {
         //require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subFreezingPrice()));
-        require(megaCandyToken.burnFromSystem(msg.sender, unicornManagement.subFreezingPrice()));
+        require(megaCandyToken.burnFromSystem(msg.sender,   unicornManagement.subFreezingPrice()));
         unicornToken.minusFreezingTime(_unicornId, unicornManagement.subFreezingTime());
     }
 

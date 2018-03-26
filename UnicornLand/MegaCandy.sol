@@ -1,4 +1,4 @@
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.21;
 
 library SafeMath {
 
@@ -67,6 +67,7 @@ contract UnicornManagementInterface {
     function unicornTokenAddress() external view returns (address);
     function candyToken() external view returns (address);
     function candyPowerToken() external view returns (address);
+    function unicornBreedingAddress() external view returns (address);
 
 
     function paused() external view returns (bool);
@@ -94,7 +95,7 @@ contract LandManagement {
     address public candyToken;
     address public megaCandyToken;
     address public dividendManagerAddress; //onlyCommunity
-    address public unicornTokenAddress; //onlyOwner
+    //address public unicornTokenAddress; //onlyOwner
     address public userRankAddress;
     address public candyLandAddress;
 
@@ -102,6 +103,8 @@ contract LandManagement {
 
     event AddUnicornContract(address indexed _unicornContractAddress);
     event DelUnicornContract(address indexed _unicornContractAddress);
+    event NewUserRankAddress(address userRankAddress);
+    event NewCandyLandAddress(address candyLandAddress);
 
     modifier onlyOwner() {
         require(msg.sender == ownerAddress);
@@ -141,7 +144,8 @@ contract LandManagement {
         candyToken = unicornManagement.candyToken();
         megaCandyToken = unicornManagement.candyPowerToken();
         dividendManagerAddress = unicornManagement.dividendManagerAddress();
-        unicornTokenAddress = unicornManagement.unicornTokenAddress();
+        //unicornTokenAddress = unicornManagement.unicornTokenAddress();
+        //setUnicornContract(unicornManagement.unicornBreedingAddress());
     }
 
 
@@ -183,7 +187,7 @@ contract LandManagement {
     }
 
 
-    function setUnicornContract(address _unicornContractAddress) external onlyOwner {
+    function setUnicornContract(address _unicornContractAddress) public onlyOwner {
         require(_unicornContractAddress != address(0));
         unicornContracts[_unicornContractAddress] = true;
         emit AddUnicornContract(_unicornContractAddress);
@@ -204,11 +208,14 @@ contract LandManagement {
     function setUserRank(address _userRankAddress) external onlyOwner whenPaused {
         require(_userRankAddress != address(0));
         userRankAddress = _userRankAddress;
+        emit NewUserRankAddress(userRankAddress);
     }
 
     function setCandyLand(address _candyLandAddress) external onlyOwner whenPaused {
         require(_candyLandAddress != address(0));
         candyLandAddress = _candyLandAddress;
+        setUnicornContract(candyLandAddress);
+        emit NewCandyLandAddress(candyLandAddress);
     }
 
 
@@ -419,7 +426,7 @@ contract StandardToken is ERC20 {
     }
 
 
-    function burn(uint256 _value) public {
+   /* function burn(uint256 _value) public {
         require(_value <= balances[msg.sender]);
 
         address burner = msg.sender;
@@ -427,7 +434,7 @@ contract StandardToken is ERC20 {
         totalSupply_ = totalSupply_.sub(_value);
         emit Burn(burner, _value);
         emit Transfer(burner, address(0), _value);
-    }
+    }*/
 }
 
 
@@ -468,6 +475,7 @@ contract MagaCandy is StandardToken, LandAccessControl {
         //contract address here
         emit Burn(msg.sender, _value);
         emit Transfer(_from, address(0), _value);
+        return true;
     }
 
 
@@ -482,9 +490,17 @@ contract MagaCandy is StandardToken, LandAccessControl {
 
 }
 
+
+contract MegaCandyInterface is ERC20 {
+    function transferFromSystem(address _from, address _to, uint256 _value) public returns (bool);
+    function burnFromSystem(address _from, uint256 _value) public returns (bool);
+    function mint(address _to, uint256 _amount) public returns (bool);
+}
+
+
+
 //TODO presale
 //TODO buy with eth
-//TODO ?? burn
 contract UserRank is LandAccessControl {
     using SafeMath for uint256;
 
@@ -503,6 +519,11 @@ contract UserRank is LandAccessControl {
 
     mapping (address => uint) public userRanks;
 
+    event TokensTransferred(address wallet, uint value);
+    event NewRankAdded(uint index, uint _landLimit, string _title, uint _priceCandy, uint _priceEth);
+    event RankChange(uint index, uint priceCandy, uint priceEth);
+    event BuyNextRank(address indexed owner, uint index);
+    event BuyRank(address indexed owner, uint index);
 
     function UserRank(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
         candyToken = ERC20(landManagement.candyToken());
@@ -519,6 +540,7 @@ contract UserRank is LandAccessControl {
         r.priceCandy = _priceCandy;
         r.priceEth = _priceEth;
         r.title = _title;
+        emit NewRankAdded(ranksCount, _landLimit,_title,_priceCandy,_priceEth);
     }
 
 
@@ -527,6 +549,7 @@ contract UserRank is LandAccessControl {
         Rank storage r = ranks[_index];
         r.priceCandy = _priceCandy;
         r.priceEth = _priceEth;
+        emit RankChange(_index, _priceCandy, _priceEth);
     }
 
 
@@ -536,6 +559,7 @@ contract UserRank is LandAccessControl {
 
         require(candyToken.transferFrom(msg.sender, this, ranks[_index].priceCandy));
         userRanks[msg.sender] = _index;
+        emit BuyNextRank(msg.sender, _index);
     }
 
 
@@ -547,6 +571,7 @@ contract UserRank is LandAccessControl {
 
         require(candyToken.transferFrom(msg.sender, this, fullPrice));
         userRanks[msg.sender] = _index;
+        emit BuyRank(msg.sender, _index);
     }
 
 
@@ -556,6 +581,7 @@ contract UserRank is LandAccessControl {
         require(_index <= ranksCount);
         userRanks[_user] = _index;
         return _index;
+        emit BuyNextRank(msg.sender, _index);
     }
 
 
@@ -608,8 +634,308 @@ contract UserRank is LandAccessControl {
 
     function withdrawTokens() onlyManager public {
         require(candyToken.balanceOf(this) > 0);
+        emit TokensTransferred(landManagement.walletAddress(), candyToken.balanceOf(this));
         candyToken.transfer(landManagement.walletAddress(), candyToken.balanceOf(this));
     }
 
 
 }
+
+
+contract UserRankInterface  {
+    function buyNextRank() public;
+    function buyRank(uint _index) public;
+    function getIndividualPrice(address _user, uint _index) public view returns (uint);
+    function getRankPriceEth(uint _index) public view returns (uint);
+    function getRankPriceCandy(uint _index) public view returns (uint);
+    function getRankLandLimit(uint _index) public view returns (uint);
+    function getRankTitle(uint _index) public view returns (string);
+    function getUserRank(address _user) public view returns (uint);
+    function getUserLandLimit(address _user) public view returns (uint);
+    function ranksCount() public view returns (uint);
+    function getNextRank(address _user)  public returns (uint);
+}
+
+
+contract CandyLand is ERC20, LandAccessControl {
+    using SafeMath for uint256;
+
+    UserRankInterface public userRank;
+    MegaCandyInterface public megaCandy;
+    ERC20 public candyToken;
+
+    struct Garden {
+        uint count;
+        uint endTime;
+        address owner;
+    }
+
+
+    string public constant name = "CandyLand";
+    string public constant symbol = "CLC";
+    uint8 public constant decimals = 0;
+
+    uint256 totalSupply_;
+    uint256 public constant MAX_SUPPLY = 30000;
+
+    uint public constant plantedTime = 3 minutes;
+    uint public constant plantedRate = 1 ether;
+    uint public constant priceRate = 1 ether;
+
+    mapping(address => uint256) balances;
+    mapping (address => mapping (address => uint256)) internal allowed;
+    mapping(address => uint256) planted;
+
+
+    mapping(uint => Garden) public gardens;
+    uint gardenId = 0;
+
+
+    event Mint(address indexed to, uint256 amount);
+    event MakePlant(address indexed owner, uint gardenId, uint count);
+    event GetCrop(address indexed owner, uint gardenId, uint  megaCandyCount);
+
+
+    function totalSupply() public view returns (uint256) {
+        return totalSupply_;
+    }
+
+
+
+    function transfer(address _to, uint256 _value) public returns (bool) {
+        require(_to != address(0));
+        require(_value <= balances[msg.sender].sub(planted[msg.sender]));
+        require(balances[_to].add(_value) <= userRank.getUserLandLimit(_to));
+
+        // SafeMath.sub will throw if there is not enough balance.
+        balances[msg.sender] = balances[msg.sender].sub(_value);
+        balances[_to] = balances[_to].add(_value);
+        emit Transfer(msg.sender, _to, _value);
+        return true;
+    }
+
+
+    function balanceOf(address _owner) public view returns (uint256 balance) {
+        return balances[_owner];
+    }
+
+    function plantedOf(address _owner) public view returns (uint256 balance) {
+        return planted[_owner];
+    }
+
+
+    function freeLandsOf(address _owner) public view returns (uint256 balance) {
+        return balances[_owner].sub(planted[_owner]);
+    }
+
+
+
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+        require(_to != address(0));
+        require(_value <= balances[_from].sub(planted[_from]));
+        require(_value <= allowed[_from][msg.sender]);
+        require(balances[_to].add(_value) <= userRank.getUserLandLimit(_to));
+
+        balances[_from] = balances[_from].sub(_value);
+        balances[_to] = balances[_to].add(_value);
+        allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
+        emit Transfer(_from, _to, _value);
+        return true;
+    }
+
+
+    function approve(address _spender, uint256 _value) public returns (bool) {
+        allowed[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
+        return true;
+    }
+
+
+    function allowance(address _owner, address _spender) public view returns (uint256) {
+        return allowed[_owner][_spender];
+    }
+
+
+    function increaseApproval(address _spender, uint _addedValue) public returns (bool) {
+        allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_addedValue);
+        emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+        return true;
+    }
+
+
+    function decreaseApproval(address _spender, uint _subtractedValue) public returns (bool) {
+        uint oldValue = allowed[msg.sender][_spender];
+        if (_subtractedValue > oldValue) {
+            allowed[msg.sender][_spender] = 0;
+        } else {
+            allowed[msg.sender][_spender] = oldValue.sub(_subtractedValue);
+        }
+        emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+        return true;
+    }
+
+
+
+
+    //TODO ??
+    function transferFromSystem(address _from, address _to, uint256 _value) onlyUnicornContract public returns (bool) {
+        require(_to != address(0));
+        require(_value <= balances[_from]);
+
+        balances[_from] = balances[_from].sub(_value);
+        balances[_to] = balances[_to].add(_value);
+        emit Transfer(_from, _to, _value);
+        return true;
+    }
+
+
+    function _mint(address _to, uint256 _amount) internal returns (bool) {
+        require(totalSupply_.add(_amount) <= MAX_SUPPLY);
+        require(balances[_to].add(_amount) <= userRank.getUserLandLimit(_to));
+        totalSupply_ = totalSupply_.add(_amount);
+        balances[_to] = balances[_to].add(_amount);
+        emit Mint(_to, _amount);
+        emit Transfer(address(0), _to, _amount);
+        return true;
+    }
+
+
+
+
+    function makePlant(uint _count) public {
+        require(_count <= balances[msg.sender].sub(planted[msg.sender]));
+        require(candyToken.transferFrom(msg.sender, this, _count.mul(priceRate)));
+
+        gardens[++gardenId] = Garden({
+            count: _count,
+            endTime: now + plantedTime,
+            owner: msg.sender
+            });
+
+        planted[msg.sender] = planted[msg.sender].add(_count);
+
+        emit MakePlant(msg.sender, gardenId, _count);
+    }
+
+
+    function getCrop(uint _gardenId) public {
+        require(msg.sender == gardens[_gardenId].owner);
+        require(gardens[_gardenId].endTime <= now);
+
+        uint crop = gardens[_gardenId].count.mul(plantedRate);
+        megaCandy.mint(msg.sender, crop);
+
+        planted[msg.sender] = planted[msg.sender].sub(gardens[_gardenId].count);
+        emit GetCrop(msg.sender, _gardenId, crop);
+        delete gardens[_gardenId];
+    }
+
+
+}
+
+
+//TODO stop eth sale
+//TODO change price in managment
+//TODO presale
+//TODO sell in candy
+//TODO list of gardens
+//TODO PAUSE где надо??
+contract CandyLandCrowdsale is CandyLand {
+
+    uint public landPriceWei = 10000000000000000;
+
+    event FundsTransferred(address dividendManager, uint value);
+    event TokensTransferred(address wallet, uint value);
+    event BuyLand(address indexed owner, uint count);
+
+
+
+    function CandyLandCrowdsale(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
+    }
+
+
+    function init() onlyLandManagement whenPaused external {
+        userRank = UserRankInterface(landManagement.userRankAddress());
+        megaCandy = MegaCandyInterface(landManagement.megaCandyToken());
+        candyToken = ERC20(landManagement.candyToken());
+    }
+
+
+    function () public payable {
+        buyLandForEth();
+    }
+
+
+
+
+    function buyLandForEth() public payable {
+        require(totalSupply_ < MAX_SUPPLY);
+        //MAX_SUPPLY проверяется так же в _mint
+        require(msg.value >= landPriceWei);
+
+        uint weiAmount = msg.value;
+        uint landCount = 0;
+        uint _landAmount = 0;
+        uint userRankIndex = userRank.getUserRank(msg.sender);
+        uint ranksCount = userRank.ranksCount();
+
+        for(uint i = userRankIndex; i <= ranksCount && weiAmount >= landPriceWei; i++) {
+
+            uint userLandLimit = userRank.getRankLandLimit(i).sub(balances[msg.sender]).sub(_landAmount);
+            landCount = weiAmount.div(landPriceWei);
+
+            if (landCount <= userLandLimit ) {
+
+                _landAmount = _landAmount.add(landCount);
+                weiAmount = weiAmount.sub(landCount.mul(landPriceWei));
+                break;
+
+            } else {
+                /*
+                  Заведомо больше чем лимит, поэтому забираем весь лимит и если это не последнний ранг и есть
+                  деньги на следубщий покупаем его и переходим на новый шаг.
+                */
+                _landAmount = _landAmount.add(userLandLimit);
+                weiAmount = weiAmount.sub(userLandLimit.mul(landPriceWei));
+                uint nextPrice = userRank.getRankPriceEth(i+1);
+
+                if (i == ranksCount || weiAmount < nextPrice) {
+                    break;
+                }
+
+                userRank.getNextRank(msg.sender);
+                weiAmount = weiAmount.sub(nextPrice);
+            }
+
+        }
+
+        _mint(msg.sender,_landAmount);
+
+        emit BuyLand(msg.sender,_landAmount);
+
+        if (weiAmount > 0) {
+            msg.sender.transfer(weiAmount);
+        }
+
+    }
+
+
+
+
+    function withdrawTokens() onlyManager public {
+        require(candyToken.balanceOf(this) > 0);
+        emit TokensTransferred(landManagement.walletAddress(), candyToken.balanceOf(this));
+        candyToken.transfer(landManagement.walletAddress(), candyToken.balanceOf(this));
+    }
+
+
+    function transferEthersToDividendManager(uint _value) onlyManager public {
+        require(address(this).balance >= _value);
+        DividendManagerInterface dividendManager = DividendManagerInterface(landManagement.dividendManagerAddress());
+        dividendManager.payDividend.value(_value)();
+        emit FundsTransferred(landManagement.dividendManagerAddress(), _value);
+    }
+
+
+}
+
