@@ -575,7 +575,7 @@ contract UserRank is LandAccessControl {
     }
 
 
-    //TODO ?? стремная лазейка
+    //TODO ?? 
     function getNextRank(address _user) onlyUnicornContract public returns (uint) {
         uint _index = userRanks[_user] + 1;
         require(_index <= ranksCount);
