@@ -947,6 +947,11 @@ contract CandyLandBase is ERC20, LandAccessControl {
     }
 
 
+    function getUserLandLimit(address _user) external view returns(uint) {
+        return userRank.getRankLandLimit(userRank.getUserRank(_user)).sub(balances[_user]);
+    }
+
+
 }
 
 
@@ -1031,6 +1036,43 @@ contract CandyLand is CandyLandBase {
         }
 
     }
+
+
+
+    function buyLandForCandy(uint _count)  public  {
+        require(totalSupply_.add(_count) <= MAX_SUPPLY);
+        //MAX_SUPPLY проверяется так же в _mint
+        uint landPriceWei = landManagement.landPriceWei();
+        uint totalPrice = _count.mul(_count);
+        uint userLandLimit = userRank.getRankLandLimit(userRank.getUserRank(msg.sender)).sub(balances[msg.sender]);
+
+        if (_count <= userLandLimit) {
+            require(candyToken.transferFrom(msg.sender, this, totalPrice));
+        } else {
+            uint userRankIndex = userRank.getUserRank(msg.sender);
+            uint ranksCount = userRank.ranksCount();
+            uint neededRank = userRankIndex;
+
+            for(uint i = userRankIndex+1; i <= ranksCount; i++) {
+                neededRank = i;
+                if (count <= userRank.getRankLandLimit(i).sub(balances[msg.sender])  ) {
+                    break;
+                }
+            }
+
+            if (neededRank > userRankIndex) {
+                totalPrice = totalPrice.add(userRank.getIndividualPrice(msg.sender, neededRank));
+            }
+
+            require(candyToken.transferFrom(msg.sender, this, totalPrice));
+        }
+
+        _mint(msg.sender,_landAmount);
+
+        emit BuyLand(msg.sender,_landAmount);
+    }
+
+
 
     //TODO limit
     function createPresale(address _owner, uint _count, uint _rankIndex) onlyManager public {
