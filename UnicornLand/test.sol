@@ -1,191 +1,68 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.4.18;
 
-library SafeMath {
 
-    /**
-    * @dev Multiplies two numbers, throws on overflow.
-    */
-    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-        if (a == 0) {
-            return 0;
-        }
-        uint256 c = a * b;
-        assert(c / a == b);
-        return c;
+interface tokenRecipient { function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public; }
+
+contract Test1 {
+
+    function approveAndCall(address _spender, uint256 _value, bytes _extraData) public
+    returns (bool success) {
+        tokenRecipient spender = tokenRecipient(_spender);
+        //if (approve(_spender, _value)) {
+        spender.receiveApproval(msg.sender, _value, this, _extraData);
+        return true;
+        //}
     }
 
-    /**
-    * @dev Integer division of two numbers, truncating the quotient.
-    */
-    function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        // assert(b > 0); // Solidity automatically throws when dividing by 0
-        uint256 c = a / b;
-        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-        return c;
+    function test(address _addr) public {
+        bytes memory  var1 = hex"74135154";
+        approveAndCall(_addr,20,var1);
+
     }
 
-    /**
-    * @dev Subtracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
-    */
-    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-        assert(b <= a);
-        return a - b;
-    }
-
-    /**
-    * @dev Adds two numbers, throws on overflow.
-    */
-    function add(uint256 a, uint256 b) internal pure returns (uint256) {
-        uint256 c = a + b;
-        assert(c >= a);
-        return c;
-    }
 }
 
-contract test {
-    using SafeMath for uint256;
-    uint public landPriceWei = 10000000000000000;
 
-    struct Rank{
-        uint landLimit;
-        uint priceCandy;
-        uint priceEth;
-        string title;
+
+contract ThatCallsSomeContract {
+    bytes4 public  f1;
+    bytes4 public  f2;
+    bytes4 public  f3;
+
+
+    event callf1(address _from);
+    event callf2(address _from, uint var1);
+    event callf3(address _from, uint var1, uint var2);
+
+    function func1() public {
+        callf1(this);
     }
 
-    uint public totalSupply_ = 0;
-
-    mapping(address => uint256) public balances;
-
-
-    function _mint(address _to, uint256 _amount) internal returns (bool) {
-        require(totalSupply_.add(_amount) <= MAX_SUPPLY);
-       // require(balances[_to].add(_amount) <= userRank.getUserLandLimit(_to));
-       // totalSupply_ = totalSupply_.add(_amount);
-        balances[_to] = balances[_to].add(_amount);
-       // emit Mint(_to, _amount);
-      //  emit Transfer(address(0), _to, _amount);
-        return true;
+    function func2(uint _x) public {
+        callf2(this, _x);
     }
-    uint256 public constant MAX_SUPPLY = 32;
 
-    mapping (uint => Rank) public ranks;
-    uint public ranksCount = 0;
-    event log(string s, uint i, uint b);
+    function func3(uint _x, uint _x2) public {
+        callf3(this, _x, _x2);
+    }
 
-    mapping (address => uint) public userRanks;
-    uint public lands;
-    uint public urank;
+    function ThatCallsSomeContract() {
+        f1 = bytes4(keccak256("func1()"));
+        f2 = bytes4(keccak256("func1(uint256)"));
+        f3 = bytes4(keccak256("func1(uint256,uint256)"));
+    }
+
+
+
+    function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public {
+        require(address(this).call(_extraData));
+    }
 
     function test() public {
-        addRank(10, 10, 10000000000000000, "rank");
-        addRank(20, 10, 20000000000000000, "rank");
-        addRank(30, 10, 30000000000000000, "rank");
-        addRank(40, 10, 40000000000000000, "rank");
-        addRank(50, 10, 50000000000000000, "rank");
-        addRank(60, 10, 60000000000000000, "rank");
-    }
-
-
-
-
-
-    function addRank(uint _landLimit, uint _priceCandy, uint _priceEth, string _title)  public  {
-        ranksCount++;
-        Rank storage r = ranks[ranksCount];
-        r.landLimit = _landLimit;
-        r.priceCandy = _priceCandy;
-        r.priceEth = _priceEth;
-        r.title = _title;
-    }
-
-
-
-
-    //TODO ?? стремная лазейка
-    function getNextRank(address _user)  public view returns (uint) {
-        uint _index = userRanks[_user] + 1;
-        require(_index <= ranksCount);
-        userRanks[_user] = _index;
-        return _index;
-    }
-
-
-    function getRankPriceEth(uint _index) public view returns (uint) {
-        return ranks[_index].priceEth;
-    }
-
-    function getRankLandLimit(uint _index) public view returns (uint) {
-        return ranks[_index].landLimit;
-    }
-
-
-    function getRankTitle(uint _index) public view returns (string) {
-        return ranks[_index].title;
-    }
-
-    function getUserRank(address _user) public view returns (uint) {
-        return userRanks[_user];
-    }
-
-    function getUserLandLimit(address _user) public view returns (uint) {
-        return ranks[userRanks[_user]].landLimit;
-    }
-
-    function () public payable {
-    buyLandForEth();
-    }
-
-
-    function buyLandForEth( ) public payable   {
-        require(totalSupply_ < MAX_SUPPLY);
-        uint weiAmount = msg.value;
-        uint landCount = 0;
-        //require(totalSupply_.add(landCount) <= 53);
-
-        uint _landAmount = 0;
-        uint userRankIndex = getUserRank(msg.sender);
-
-        for(uint i = userRankIndex; i <= ranksCount && weiAmount >= landPriceWei; i++) {
-
-            uint userLandLimit = getRankLandLimit(i).sub(balances[msg.sender]).sub(_landAmount);
-            landCount = weiAmount.div(landPriceWei);
-
-            if (landCount <= userLandLimit ) {
-                _landAmount = _landAmount.add(landCount);
-                weiAmount = weiAmount.sub(landCount.mul(landPriceWei));
-                break;
-
-            } else {
-
-                _landAmount = _landAmount.add(userLandLimit);
-                weiAmount = weiAmount.sub(userLandLimit.mul(landPriceWei));
-
-                if (i == ranksCount || weiAmount < getRankPriceEth(i+1)) {
-                    break;
-                }
-                getNextRank(msg.sender);
-                weiAmount = weiAmount.sub(getRankPriceEth(i+1));
-            }
-
-        }
-
-        _mint(msg.sender,_landAmount);
-        totalSupply_ = totalSupply_.add(_landAmount);
-
+        bytes memory  var1 = hex"74135154";
+        receiveApproval(this,20,this,var1);
 
     }
-
-
-
-    function getCountAndCheckSupply(uint _count) internal view returns(uint) {
-          if (totalSupply_.add(_count) <= MAX_SUPPLY) {
-              return _count;
-          } else {
-              return MAX_SUPPLY.sub(totalSupply_);
-          }
-    }
-
-
 
 }
+

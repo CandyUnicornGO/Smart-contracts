@@ -2137,8 +2137,13 @@ contract UnicornBreeding is UnicornAccessControl {
     event OfferDelete(uint256 indexed unicornId);
     event UnicornSold(uint256 indexed unicornId);
 
+    event NewSellDividendPercent(uint percentCandy, uint percentCandyEth);
+
     ERC20 public candyToken;
     megaCandyInterface public megaCandyToken;
+
+    uint public sellDividendPercentCandy = 375; //OnlyManager 4 digits. 10.5% = 1050
+    uint public sellDividendPercentEth = 375; //OnlyManager 4 digits. 10.5% = 1050
 
     //counter for gen0
     uint public gen0Limit = 30000;
@@ -2394,7 +2399,7 @@ contract UnicornBreeding is UnicornAccessControl {
         if (price == 0) {
             require(offers[_unicornId].priceCandy == 0);
         }
-        require(msg.value == unicornManagement.getSellUnicornFullPrice(price));
+        require(msg.value == getOfferPriceEth(_unicornId));
 
         address owner = unicornToken.ownerOf(_unicornId);
 
@@ -2416,7 +2421,7 @@ contract UnicornBreeding is UnicornAccessControl {
         address owner = unicornToken.ownerOf(_unicornId);
 
         if (price > 0) {
-            require(candyToken.transferFrom(msg.sender, this, unicornManagement.getSellUnicornFullPrice(price)));
+            require(candyToken.transferFrom(msg.sender, this, getOfferPriceCandy(_unicornId)));
             candyToken.transfer(owner, price);
         }
 
@@ -2448,12 +2453,31 @@ contract UnicornBreeding is UnicornAccessControl {
         }
     }
 
+
     function getOfferPriceEth(uint _unicornId) public view returns (uint) {
-        return unicornManagement.getSellUnicornFullPrice(offers[_unicornId].priceEth);
+        return offers[_unicornId].priceEth.add(valueFromPercent(offers[_unicornId].priceEth, sellDividendPercentEth));
     }
 
+
     function getOfferPriceCandy(uint _unicornId) public view returns (uint) {
-        return unicornManagement.getSellUnicornFullPrice(offers[_unicornId].priceCandy);
+        return offers[_unicornId].priceCandy.add(valueFromPercent(offers[_unicornId].priceCandy, sellDividendPercentCandy));
+    }
+
+
+    function setSellDividendPercent(uint _percentCandy, uint _percentEth) public onlyManager {
+        //no more then 25%
+        require(_percentCandy < 2500 && _percentEth < 2500);
+
+        sellDividendPercentCandy = _percentCandy;
+        sellDividendPercentEth = _percentEth;
+        emit NewSellDividendPercent(_percentCandy, _percentEth);
+    }
+
+
+    //1% - 100, 10% - 1000 50% - 5000
+    function valueFromPercent(uint _value, uint _percent) internal pure returns (uint amount)    {
+        uint _amount = _value.mul(_percent).div(10000);
+        return (_amount);
     }
 
 }
