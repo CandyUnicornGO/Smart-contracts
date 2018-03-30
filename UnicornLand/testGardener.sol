@@ -526,10 +526,34 @@ contract CandyLandBase is ERC20  {
 
     uint public mint;
 
+    struct Rank{
+        uint landLimit;
+    }
+
+
+    mapping (uint => Rank) public ranks;
+    uint public ranksCount;
+
+
+    function addRank(uint _landLimit)  public  {
+        ranksCount++;
+        Rank storage r = ranks[ranksCount];
+    }
+
     function CandyLandBase() public {
         balances[msg.sender] = 50;
         addGardener(10, 1000000000000000000);
         addGardener(20, 1000000000000000000);
+        addRank(10);
+        addRank(20);
+        addRank(30);
+        addRank(40);
+        addRank(50);
+        addRank(60);
+        addRank(70);
+        addRank(80);
+        addRank(90);
+        addRank(100);
     }
 
     function totalSupply() public view returns (uint256) {
@@ -722,6 +746,57 @@ contract CandyLandBase is ERC20  {
         g.price = _price;
         emit GardenerChange(_gardenerId, _period, _price);
     }
+
+
+    function getRankLandLimit(uint _index) returns (uint) {
+        return ranks[_index].landLimit;
+    }
+
+    uint public totalPrice;
+    uint public neededRank;
+    uint public count;
+
+    function _buyLandForCandy(address _beneficiary, uint _count)  public  {
+        require(totalSupply_.add(_count) <= MAX_SUPPLY);
+        uint landPriceCandy = 1;
+        //uint totalPrice = 0;
+        uint userLandLimit = 40;
+
+        if (_count <= userLandLimit) {
+
+            totalPrice = _count.mul(landPriceCandy);
+            //require(candyToken.transferFrom(_beneficiary, this, totalPrice));
+
+        } else {
+            uint userRankIndex = 4;
+            uint ranksCount = 10;
+            neededRank = userRankIndex;
+
+            for(uint i = userRankIndex; i <= ranksCount; i++) {
+                neededRank = i;
+                if (_count <= getRankLandLimit(i).sub(balances[_beneficiary]) ) {
+                    break;
+                }
+            }
+
+            if (neededRank > userRankIndex) {
+                totalPrice = 7;//userRank.getIndividualPrice(_beneficiary, neededRank);
+            }
+
+            userLandLimit = getRankLandLimit(neededRank).sub(balances[_beneficiary]);
+            if (_count > userLandLimit) {
+                _count = userLandLimit;
+            }
+
+            totalPrice = totalPrice.add(_count.mul(landPriceCandy));
+            count = _count;
+
+        }
+
+
+    }
+
+
 
 
 }
