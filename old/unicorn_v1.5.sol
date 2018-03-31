@@ -1527,7 +1527,8 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
     event GeneHybritizationRequestRetry(uint indexed unicornId);
     event FundsTransferred(address dividendManager, uint value);
 
-
+    address public ownOracle;
+    bool public useOwnOracle;
 
     function BlackBoxController(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
         oraclize_setCustomGasPrice(2000000000 wei);
