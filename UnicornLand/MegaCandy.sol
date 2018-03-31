@@ -837,7 +837,7 @@ contract CandyLandBase is ERC20, LandAccessControl {
     uint8 public constant decimals = 0;
 
     uint256 totalSupply_;
-    uint256 public constant MAX_SUPPLY = 30000;
+    uint256 public MAX_SUPPLY = 30000;
 
     uint public constant plantedTime = 5 minutes;
     uint public constant plantedRate = 1 ether;
@@ -1077,7 +1077,7 @@ contract CandyLandBase is ERC20, LandAccessControl {
     //TODO эта же функция у нас в бридинге!!!
     function setLandLimit() external onlyCommunity {
         require(totalSupply_ == MAX_SUPPLY);
-        MAX_SUPPLY = MAX_SUPPLY.add(valueFromPercent(totalSupply_,1500));
+        MAX_SUPPLY = MAX_SUPPLY.add(valueFromPercent(totalSupply_, 1500));
         emit NewLandLimit(MAX_SUPPLY);
     }
 
@@ -1087,8 +1087,6 @@ contract CandyLandBase is ERC20, LandAccessControl {
         return (_amount);
     }
 }
-
-
 
 
 //TODO list of gardens
