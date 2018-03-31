@@ -577,9 +577,34 @@ contract MegaCandyInterface is ERC20 {
 }
 
 
+contract CanReceiveApproval {
+    event ReceiveApproval(address from, uint256 value, address token);
+
+    mapping (bytes4 => bool) allowedFuncs;
+
+    modifier onlyPayloadSize(uint numwords) {
+        //TODO  == || >= ?? =)
+        assert(msg.data.length >= numwords * 32 + 4);
+        _;
+    }
+
+    modifier onlySelf(){
+        require(msg.sender == address(this));
+        _;
+    }
+
+
+    function bytesToBytes4(bytes b) internal pure returns (bytes4 out) {
+        for (uint i = 0; i < 4; i++) {
+            out |= bytes4(b[i] & 0xFF) >> (i << 3);
+        }
+    }
+
+}
+
 
 //TODO presale
-contract UserRank is LandAccessControl {
+contract UserRank is LandAccessControl, CanReceiveApproval {
     using SafeMath for uint256;
 
     ERC20 public candyToken;
@@ -595,20 +620,13 @@ contract UserRank is LandAccessControl {
     uint public ranksCount = 0;
 
     mapping (address => uint) public userRanks;
-    mapping (bytes4 => bool) allowedFuncs;
 
     event TokensTransferred(address wallet, uint value);
     event NewRankAdded(uint index, uint _landLimit, string _title, uint _priceCandy, uint _priceEth);
     event RankChange(uint index, uint priceCandy, uint priceEth);
     event BuyNextRank(address indexed owner, uint index);
     event BuyRank(address indexed owner, uint index);
-    event ReceiveApproval(address from, uint256 value, address token);
 
-    modifier onlyPayloadSize(uint numwords) {
-        //TODO  == || >= ?? =)
-        assert(msg.data.length >= numwords * 32 + 4);
-        _;
-    }
 
 
     function UserRank(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
@@ -669,7 +687,7 @@ contract UserRank is LandAccessControl {
         _buyNextRank(msg.sender);
     }
 
-    function _receiveBuyNextRank(address _beneficiary) onlyPayloadSize(1) internal {
+    function _receiveBuyNextRank(address _beneficiary) onlySelf onlyPayloadSize(1) public {
         _buyNextRank(_beneficiary);
     }
 
@@ -677,7 +695,7 @@ contract UserRank is LandAccessControl {
         _buyRank(msg.sender, _index);
     }
 
-    function _receiveBuyRank(address _beneficiary, uint _index) onlyPayloadSize(2) internal {
+    function _receiveBuyRank(address _beneficiary, uint _index) onlySelf onlyPayloadSize(2) public {
         _buyRank(_beneficiary, _index);
     }
 
@@ -794,14 +812,8 @@ contract UserRank is LandAccessControl {
         emit ReceiveApproval(_from, _value, _token);
     }
 
-
-    function bytesToBytes4(bytes b) internal pure returns (bytes4 out) {
-        for (uint i = 0; i < 4; i++) {
-            out |= bytes4(b[i] & 0xFF) >> (i << 3);
-        }
-    }
-
 }
+
 
 interface UserRankInterface  {
     function buyNextRank() external;
@@ -820,7 +832,7 @@ interface UserRankInterface  {
 }
 
 
-contract CandyLand is ERC20, LandAccessControl {
+contract CandyLand is ERC20, LandAccessControl, CanReceiveApproval {
     using SafeMath for uint256;
 
     UserRankInterface public userRank;
@@ -882,15 +894,6 @@ contract CandyLand is ERC20, LandAccessControl {
     event NewGardenerAdded(uint gardenerId, uint _period, uint _price);
     event GardenerChange(uint gardenerId, uint _period, uint _price);
     event NewLandLimit(uint newLimit);
-    event ReceiveApproval(address from, uint256 value, address token);
-
-    mapping (bytes4 => bool) allowedFuncs;
-
-    modifier onlyPayloadSize(uint numwords) {
-        //TODO  == || >= ?? =)
-        assert(msg.data.length >= numwords * 32 + 4);
-        _;
-    }
 
     function CandyLand(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
         allowedFuncs[bytes4(keccak256("_receiveMakePlant(address,uint256,uint256)"))] = true;
@@ -1004,7 +1007,7 @@ contract CandyLand is ERC20, LandAccessControl {
     }
 
 
-    function _receiveMakePlant(address _beneficiary, uint _count, uint _gardenerId) onlyPayloadSize(3) internal {
+    function _receiveMakePlant(address _beneficiary, uint _count, uint _gardenerId) onlySelf onlyPayloadSize(3) public {
         _makePlant(_beneficiary, _count, _gardenerId);
     }
 
@@ -1119,7 +1122,6 @@ contract CandyLand is ERC20, LandAccessControl {
     }
 
 
-    //TODO TEST
     function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public {
         //require(_token == landManagement.candyToken());
         require(msg.sender == landManagement.candyToken());
@@ -1128,12 +1130,6 @@ contract CandyLand is ERC20, LandAccessControl {
         emit ReceiveApproval(_from, _value, _token);
     }
 
-
-    function bytesToBytes4(bytes b) internal pure returns (bytes4 out) {
-        for (uint i = 0; i < 4; i++) {
-            out |= bytes4(b[i] & 0xFF) >> (i << 3);
-        }
-    }
 }
 
 
@@ -1147,7 +1143,7 @@ contract CandyLandInterface is ERC20 {
 //TODO list of gardens
 //TODO ?? PAUSE
 //TODO marketplace
-contract CandyLandSale is LandAccessControl {
+contract CandyLandSale is LandAccessControl, CanReceiveApproval {
     using SafeMath for uint256;
 
     UserRankInterface public userRank;
@@ -1157,15 +1153,8 @@ contract CandyLandSale is LandAccessControl {
     event FundsTransferred(address dividendManager, uint value);
     event TokensTransferred(address wallet, uint value);
     event BuyLand(address indexed owner, uint count);
-    event ReceiveApproval(address from, uint256 value, address token);
 
-    mapping (bytes4 => bool) allowedFuncs;
 
-    modifier onlyPayloadSize(uint numwords) {
-        //TODO  == || >= ?? =)
-        assert(msg.data.length >= numwords * 32 + 4);
-        _;
-    }
 
 
     function CandyLandSale(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
@@ -1242,7 +1231,7 @@ contract CandyLandSale is LandAccessControl {
         _buyLandForCandy(msg.sender, _count);
     }
 
-    function _receiveBuyLandForCandy(address _owner, uint _count) onlyPayloadSize(2) internal {
+    function _receiveBuyLandForCandy(address _owner, uint _count) onlySelf onlyPayloadSize(2) public {
         _buyLandForCandy(_owner, _count);
     }
 
@@ -1380,7 +1369,7 @@ contract CandyLandSale is LandAccessControl {
         emit FundsTransferred(landManagement.dividendManagerAddress(), _value);
     }
 
-    //TODO TEST
+
     function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public {
         //require(_token == landManagement.candyToken());
         require(msg.sender == landManagement.candyToken());
@@ -1388,13 +1377,4 @@ contract CandyLandSale is LandAccessControl {
         require(address(this).call(_extraData));
         emit ReceiveApproval(_from, _value, _token);
     }
-
-
-    function bytesToBytes4(bytes b) internal pure returns (bytes4 out) {
-        for (uint i = 0; i < 4; i++) {
-            out |= bytes4(b[i] & 0xFF) >> (i << 3);
-        }
-    }
-
-
 }
