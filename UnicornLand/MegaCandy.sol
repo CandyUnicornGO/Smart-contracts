@@ -88,13 +88,13 @@ contract LandManagement {
 
     UnicornManagementInterface public unicornManagement;
 
-//    address public ownerAddress;
-//    address public managerAddress;
-//    address public communityAddress;
-//    address public walletAddress;
-//    address public candyToken;
-//    address public megaCandyToken;
-//    address public dividendManagerAddress; //onlyCommunity
+    //    address public ownerAddress;
+    //    address public managerAddress;
+    //    address public communityAddress;
+    //    address public walletAddress;
+    //    address public candyToken;
+    //    address public megaCandyToken;
+    //    address public dividendManagerAddress; //onlyCommunity
     //address public unicornTokenAddress; //onlyOwner
     address public userRankAddress;
     address public candyLandAddress;
@@ -145,21 +145,21 @@ contract LandManagement {
 
     function LandManagement(address _unicornManagementAddress) public {
         unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
-//        unicornManagement.registerInit(this);
+        //        unicornManagement.registerInit(this);
     }
 
 
-//    function init() onlyUnicornManagement whenPaused external {
-//        ownerAddress = unicornManagement.ownerAddress();
-//        managerAddress = unicornManagement.managerAddress();
-//        communityAddress = unicornManagement.communityAddress();
-//        walletAddress = unicornManagement.walletAddress();
-//        candyToken = unicornManagement.candyToken();
-//        megaCandyToken = unicornManagement.candyPowerToken();
-//        dividendManagerAddress = unicornManagement.dividendManagerAddress();
-//        //unicornTokenAddress = unicornManagement.unicornTokenAddress();
-//        //setUnicornContract(unicornManagement.unicornBreedingAddress());
-//    }
+    //    function init() onlyUnicornManagement whenPaused external {
+    //        ownerAddress = unicornManagement.ownerAddress();
+    //        managerAddress = unicornManagement.managerAddress();
+    //        communityAddress = unicornManagement.communityAddress();
+    //        walletAddress = unicornManagement.walletAddress();
+    //        candyToken = unicornManagement.candyToken();
+    //        megaCandyToken = unicornManagement.candyPowerToken();
+    //        dividendManagerAddress = unicornManagement.dividendManagerAddress();
+    //        //unicornTokenAddress = unicornManagement.unicornTokenAddress();
+    //        //setUnicornContract(unicornManagement.unicornBreedingAddress());
+    //    }
 
 
     struct InitItem {
@@ -171,7 +171,7 @@ contract LandManagement {
     address[] private initList;
 
     function registerInit(address _contract) external whenPaused {
-        require(msg.sender == ownerAddress || tx.origin == ownerAddress);
+        require(msg.sender == ownerAddress() || tx.origin == ownerAddress());
 
         if (!initItems[_contract].exists) {
             initItems[_contract] = InitItem({
@@ -301,7 +301,7 @@ contract LandManagementInterface {
     function communityAddress() external view returns (address);
     function dividendManagerAddress() external view returns (address);
     function walletAddress() external view returns (address);
-//    function unicornTokenAddress() external view returns (address);
+    //    function unicornTokenAddress() external view returns (address);
     function candyToken() external view returns (address);
     function megaCandyToken() external view returns (address);
     function userRankAddress() external view returns (address);
@@ -602,7 +602,6 @@ contract UserRank is LandAccessControl {
 
 
     function UserRank(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
-        candyToken = ERC20(landManagement.candyToken());
 
         allowedFuncs[bytes4(keccak256("_receiveBuyNextRank(address)"))] = true;
         allowedFuncs[bytes4(keccak256("_receiveBuyRank(address,uint256)"))] = true;
@@ -620,14 +619,15 @@ contract UserRank is LandAccessControl {
 
     }
 
-    function init() onlyLandManagement whenPaused external view {
+    function init() onlyLandManagement whenPaused external {
+        candyToken = ERC20(landManagement.candyToken());
     }
 
 
     //TODO ?? onlyCommunity
     function addRank(uint _landLimit, uint _priceCandy, uint _priceEth, string _title) onlyCommunity public  {
         //стоимость добавляемого должна быть не ниже предыдущего
-        requre(ranks[ranksCount].priceCandy <= _priceCandy && ranks[ranksCount].priceEth <= _priceEth);
+        require(ranks[ranksCount].priceCandy <= _priceCandy && ranks[ranksCount].priceEth <= _priceEth);
         ranksCount++;
         Rank storage r = ranks[ranksCount];
 
@@ -643,10 +643,10 @@ contract UserRank is LandAccessControl {
     function editRank(uint _index, uint _priceCandy, uint _priceEth) onlyCommunity public  {
         require(_index > 0 && _index <= ranksCount);
         if (_index > 1) {
-            requre(ranks[_index - 1].priceCandy <= _priceCandy && ranks[_index - 1].priceEth <= _priceEth);
+            require(ranks[_index - 1].priceCandy <= _priceCandy && ranks[_index - 1].priceEth <= _priceEth);
         }
         if (_index < ranksCount) {
-            requre(ranks[_index + 1].priceCandy >= _priceCandy && ranks[_index + 1].priceEth >= _priceEth);
+            require(ranks[_index + 1].priceCandy >= _priceCandy && ranks[_index + 1].priceEth >= _priceEth);
         }
 
         Rank storage r = ranks[_index];
@@ -824,12 +824,13 @@ contract CandyLandBase is ERC20, LandAccessControl {
     }
 
     struct Garden {
-        uint plantationIndex;
         uint count;
         uint startTime;
         address owner;
         uint gardenerId;
         uint lastCropTime;
+        uint plantationIndex;
+        uint ownerPlantationIndex;
     }
 
     string public constant name = "CandyLand";
@@ -870,6 +871,7 @@ contract CandyLandBase is ERC20, LandAccessControl {
     event GetCrop(address indexed owner, uint gardenId, uint  megaCandyCount);
     event NewGardenerAdded(uint gardenerId, uint _period, uint _price);
     event GardenerChange(uint gardenerId, uint _period, uint _price);
+    event NewLandLimit(uint newLimit);
 
     modifier onlyPayloadSize(uint numwords) {
         //TODO  == || >= ?? =)
@@ -948,7 +950,7 @@ contract CandyLandBase is ERC20, LandAccessControl {
     function transferFromSystem(address _from, address _to, uint256 _value) onlyUnicornContract public returns (bool) {
         require(_to != address(0));
         require(_value <= balances[_from].sub(planted[_from]));
-//    require(_value <= balances[_from]);
+        //    require(_value <= balances[_from]);
         require(balances[_to].add(_value) <= userRank.getUserLandLimit(_to));
 
         balances[_from] = balances[_from].sub(_value);
@@ -1003,7 +1005,7 @@ contract CandyLandBase is ERC20, LandAccessControl {
         //update user plantation list
         ownerPlantation[_owner][ownerPlantationSize[_owner]++] = gardenId;
 
-        emit MakePlant(_beneficiary, gardenId, _count, gardenerId);
+        emit MakePlant(_owner, gardenId, _count, gardenerId);
     }
 
 
@@ -1033,12 +1035,12 @@ contract CandyLandBase is ERC20, LandAccessControl {
 
             //delete from global plantation list
             gardens[plantation[--plantationSize]].plantationIndex = gardens[_gardenId].plantationIndex;
-            plantation[gardens[_unicornId].plantationIndex] = plantation[plantationSize];
+            plantation[gardens[_gardenId].plantationIndex] = plantation[plantationSize];
             delete plantation[plantationSize];
 
             //delete from user plantation list
             gardens[ownerPlantation[msg.sender][--ownerPlantationSize[msg.sender]]].ownerPlantationIndex = gardens[_gardenId].ownerPlantationIndex;
-            ownerPlantation[msg.sender][gardens[_unicornId].ownerPlantationIndex] = ownerPlantation[msg.sender][ownerPlantationSize[msg.sender]];
+            ownerPlantation[msg.sender][gardens[_gardenId].ownerPlantationIndex] = ownerPlantation[msg.sender][ownerPlantationSize[msg.sender]];
             delete ownerPlantation[msg.sender][ownerPlantationSize[msg.sender]];
 
             delete gardens[_gardenId];
@@ -1121,7 +1123,7 @@ contract CandyLand is CandyLandBase {
 
 
     function buyLandForEth() onlyWhileEthSaleOpen public payable {
-        require(totalSupply_ < MAX_SUPPLY);
+        require(totalSupply_ <= MAX_SUPPLY);
         //MAX_SUPPLY проверяется так же в _mint
         uint landPriceWei = landManagement.landPriceWei();
         require(msg.value >= landPriceWei);
@@ -1181,68 +1183,129 @@ contract CandyLand is CandyLandBase {
         _buyLandForCandy(_beneficiary, _count);
     }
 
+    function getNeededRank(address _owner, uint _count) public view returns (uint neededRank) {
+        require(_count > 0);
+        neededRank = userRank.getUserRank(_owner);
+        uint landLimit = userRank.getRankLandLimit(neededRank).sub(balances[_owner]);
 
-    function _buyLandForCandy(address _beneficiary, uint _count) internal  {
-        require(totalSupply_.add(_count) <= MAX_SUPPLY);
-        uint landPriceCandy = landManagement.landPriceCandy();
-        uint totalPrice = 0;
-        uint userLandLimit = getUserLandLimit(_beneficiary);
-
-        if (_count <= userLandLimit) {
-
-            totalPrice = _count.mul(landPriceCandy);
-            require(candyToken.transferFrom(_beneficiary, this, totalPrice));
-
-        } else {
-            uint userRankIndex = userRank.getUserRank(_beneficiary);
+        if (_count > landLimit) {
             uint ranksCount = userRank.ranksCount();
-            uint neededRank = userRankIndex;
-
-            for(uint i = userRankIndex; i <= ranksCount; i++) {
-                neededRank = i;
-                if (_count <= userRank.getRankLandLimit(i).sub(balances[_beneficiary]) ) {
-                    break;
+            if (neededRank < ranksCount) {
+                for(neededRank = neededRank + 1; neededRank <= ranksCount; neededRank++) {
+                    if (_count <= userRank.getRankLandLimit(neededRank).sub(balances[_owner]) ) {
+                        break;
+                    }
                 }
             }
+        }
+    }
 
-            if (neededRank > userRankIndex) {
-                totalPrice = userRank.getIndividualPrice(_beneficiary, neededRank);
-            }
 
-            userLandLimit = userRank.getRankLandLimit(neededRank).sub(balances[_beneficiary]);
-            if (_count > userLandLimit) {
-                _count = userLandLimit;
-            }
+    function getBuyLandCost(address _owner, uint _count) public view returns (uint totalPrice){
+        uint rank = userRank.getUserRank(_owner);
+        uint neededRank = getNeededRank(_owner, _count);
+        uint landLimit = userRank.getRankLandLimit(neededRank).sub(balances[_owner]);
+        uint landPriceCandy = landManagement.landPriceCandy();
 
-            totalPrice = totalPrice.add(_count.mul(landPriceCandy));
+        if (_count > landLimit) {
+            _count = landLimit;
+        }
+        require(_count > 0);
 
-            require(candyToken.transferFrom(_beneficiary, this, totalPrice));
-            userRank.getRank(_beneficiary, neededRank);
+        if (rank < neededRank) {
+            totalPrice = userRank.getIndividualPrice(_owner, neededRank);
+        }
+        totalPrice = totalPrice.add(_count.mul(landPriceCandy));
+    }
 
+    function _buyLandForCandy(address _owner, uint _count) internal  {
+        require(totalSupply_.add(_count) <= MAX_SUPPLY);
+        uint landPriceCandy = landManagement.landPriceCandy();
+
+        uint rank = userRank.getUserRank(_owner);
+        uint neededRank = getNeededRank(_owner, _count);
+        uint landLimit = userRank.getRankLandLimit(neededRank).sub(balances[_owner]);
+        uint totalPrice = 0;
+
+        if (_count > landLimit) {
+            _count = landLimit;
+        }
+        require(_count > 0);
+
+        if (rank < neededRank) {
+            totalPrice = userRank.getIndividualPrice(_owner, neededRank);
+        }
+        totalPrice = totalPrice.add(_count.mul(landPriceCandy));
+        require(candyToken.transferFrom(_owner, this, totalPrice));
+        if (rank < neededRank) {
+            userRank.getRank(_owner, neededRank);
         }
 
-        _mint(_beneficiary,_count);
-
-        emit BuyLand(_beneficiary,_count);
+        _mint(_owner, _count);
+        emit BuyLand(_owner,_count);
     }
 
+    //    function _buyLandForCandy(address _beneficiary, uint _count) internal  {
+    //        require(totalSupply_.add(_count) <= MAX_SUPPLY);
+    //        uint landPriceCandy = landManagement.landPriceCandy();
+    //        uint totalPrice = 0;
+    //        uint userLandLimit = getUserLandLimit(_beneficiary);
+    //
+    //        if (_count <= userLandLimit) {
+    //
+    //            totalPrice = _count.mul(landPriceCandy);
+    //            require(candyToken.transferFrom(_beneficiary, this, totalPrice));
+    //
+    //        } else {
+    //            uint userRankIndex = userRank.getUserRank(_beneficiary);
+    //            uint ranksCount = userRank.ranksCount();
+    //            uint neededRank = userRankIndex;
+    //
+    //            for(uint i = userRankIndex; i <= ranksCount; i++) {
+    //                neededRank = i;
+    //                if (_count <= userRank.getRankLandLimit(i).sub(balances[_beneficiary]) ) {
+    //                    break;
+    //                }
+    //            }
+    //
+    //            if (neededRank > userRankIndex) {
+    //                totalPrice = userRank.getIndividualPrice(_beneficiary, neededRank);
+    //            }
+    //
+    //            userLandLimit = userRank.getRankLandLimit(neededRank).sub(balances[_beneficiary]);
+    //            if (_count > userLandLimit) {
+    //                _count = userLandLimit;
+    //            }
+    //
+    //            totalPrice = totalPrice.add(_count.mul(landPriceCandy));
+    //
+    //            require(candyToken.transferFrom(_beneficiary, this, totalPrice));
+    //            userRank.getRank(_beneficiary, neededRank);
+    //
+    //        }
+    //
+    //        _mint(_beneficiary,_count);
+    //
+    //        emit BuyLand(_beneficiary,_count);
+    //    }
 
-    function getLandFullPriceForCandy(address _beneficiary, uint _count) public view {
 
-    }
+    // function getLandFullPriceForCandy(address _beneficiary, uint _count) public view {
+
+    // }
 
 
     function createPresale(address _owner, uint _count, uint _rankIndex) onlyManager whilePresaleOpen public {
         require(totalSupply_.add(_count) <= MAX_SUPPLY);
-        _mint(_owner,_count);
-        userRank.getPreSaleRank(_owner,_rankIndex);
+        _mint(_owner, _count);
+        userRank.getPreSaleRank(_owner, _rankIndex);
     }
 
 
     function withdrawTokens() onlyManager public {
         require(candyToken.balanceOf(this) > 0);
-        emit TokensTransferred(landManagement.walletAddress(), candyToken.balanceOf(this));
         candyToken.transfer(landManagement.walletAddress(), candyToken.balanceOf(this));
+        emit TokensTransferred(landManagement.walletAddress(), candyToken.balanceOf(this));
     }
 
 
