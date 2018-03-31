@@ -1479,7 +1479,7 @@ contract ERC20 {
 
 contract megaCandyInterface is ERC20 {
     function transferFromSystem(address _from, address _to, uint256 _value) public returns (bool);
-    function burnFromSystem(address _from, uint256 _value) public returns (bool);
+    function burn(address _from, uint256 _value) public returns (bool);
     function mint(address _to, uint256 _amount) public returns (bool);
 }
 
@@ -1527,7 +1527,8 @@ contract BlackBoxController is UnicornAccessControl, usingOraclize  {
     event GeneHybritizationRequestRetry(uint indexed unicornId);
     event FundsTransferred(address dividendManager, uint value);
 
-
+    address public ownOracle;
+    bool public useOwnOracle;
 
     function BlackBoxController(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
         oraclize_setCustomGasPrice(2000000000 wei);
@@ -2209,6 +2210,7 @@ contract UnicornBreeding is UnicornAccessControl {
             require(candyToken.transferFrom(msg.sender, this, getHybridizationPrice(_firstUnicornId)));
         }
 
+        plusFreezingTime(_firstUnicornId);
         plusFreezingTime(_secondUnicornId);
         uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
         //        BlackBoxInterface blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
@@ -2295,14 +2297,14 @@ contract UnicornBreeding is UnicornAccessControl {
     //change freezing time for megacandy
     function minusFreezingTime(uint _unicornId) public {
         //require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subFreezingPrice()));
-        require(megaCandyToken.burnFromSystem(msg.sender,   unicornManagement.subFreezingPrice()));
+        require(megaCandyToken.burn(msg.sender,   unicornManagement.subFreezingPrice()));
         unicornToken.minusFreezingTime(_unicornId, unicornManagement.subFreezingTime());
     }
 
     //change tour freezing time for megacandy
     function minusTourFreezingTime(uint _unicornId) public {
         //require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subTourFreezingPrice()));
-        require(megaCandyToken.burnFromSystem(msg.sender, unicornManagement.subTourFreezingPrice()));
+        require(megaCandyToken.burn(msg.sender, unicornManagement.subTourFreezingPrice()));
         unicornToken.minusTourFreezingTime(_unicornId, unicornManagement.subTourFreezingTime());
     }
 
@@ -2326,9 +2328,9 @@ contract UnicornBreeding is UnicornAccessControl {
 
     function withdrawTokens() onlyManager public {
         require(candyToken.balanceOf(this) > 0/* || candyPowerToken.balanceOf(this) > 0*/);
-//        if (candyToken.balanceOf(this) > 0) {
-            candyToken.transfer(unicornManagement.walletAddress(), candyToken.balanceOf(this));
-//        }
+        //        if (candyToken.balanceOf(this) > 0) {
+        candyToken.transfer(unicornManagement.walletAddress(), candyToken.balanceOf(this));
+        //        }
         /*if (candyPowerToken.balanceOf(this) > 0) {
             candyPowerToken.transfer(unicornManagement.walletAddress(), candyPowerToken.balanceOf(this));
         }*/
