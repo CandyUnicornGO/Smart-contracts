@@ -596,7 +596,7 @@ contract UserRank is LandAccessControl {
 
     //TODO ?? onlyCommunity
     function addRank(uint _landLimit, uint _priceCandy, uint _priceEth, string _title) onlyCommunity public  {
-        requre(ranks[ranksCount].priceCandy <= _priceCandy && ranks[ranksCount].priceEth <= _priceEth);
+        require(ranks[ranksCount].priceCandy <= _priceCandy && ranks[ranksCount].priceEth <= _priceEth);
         ranksCount++;
         Rank storage r = ranks[ranksCount];
 
@@ -655,7 +655,6 @@ contract UserRank is LandAccessControl {
     }
 
 
-    //TODO limits
     function getPreSaleRank(address _user, uint _index) onlyManager whilePresaleOpen public {
         require(_index <= ranksCount);
         require(userRanks[_user] < _index);
@@ -664,7 +663,6 @@ contract UserRank is LandAccessControl {
     }
 
 
-    //TODO ??
     function getNextRank(address _user) onlyUnicornContract public returns (uint) {
         uint _index = userRanks[_user] + 1;
         require(_index <= ranksCount);
