@@ -380,6 +380,12 @@ contract LandAccessControl {
         _;
     }
 
+    modifier onlyCandyLand() {
+        require(msg.sender == address(landManagement.candyLandAddress()));
+        _;
+    }
+
+
     modifier whilePresaleOpen() {
         require(landManagement.presaleOpen());
         _;
@@ -559,7 +565,7 @@ contract MagaCandy is StandardToken, LandAccessControl {
 
 
 
-    function mint(address _to, uint256 _amount) onlyUnicornContract public returns (bool) {
+    function mint(address _to, uint256 _amount) onlyCandyLand public returns (bool) {
         totalSupply_ = totalSupply_.add(_amount);
         balances[_to] = balances[_to].add(_amount);
         emit Mint(_to, _amount);
@@ -603,7 +609,7 @@ contract CanReceiveApproval {
 }
 
 
-//TODO presale
+
 contract UserRank is LandAccessControl, CanReceiveApproval {
     using SafeMath for uint256;
 
@@ -652,8 +658,8 @@ contract UserRank is LandAccessControl, CanReceiveApproval {
     }
 
 
-    //TODO ?? onlyCommunity
-    function addRank(uint _landLimit, uint _priceCandy, uint _priceEth, string _title) onlyCommunity public  {
+
+    function addRank(uint _landLimit, uint _priceCandy, uint _priceEth, string _title) onlyOwner public  {
         //стоимость добавляемого должна быть не ниже предыдущего
         require(ranks[ranksCount].priceCandy <= _priceCandy && ranks[ranksCount].priceEth <= _priceEth);
         ranksCount++;
@@ -667,8 +673,7 @@ contract UserRank is LandAccessControl, CanReceiveApproval {
     }
 
 
-    //TODO  ?? onlyCommunity
-    function editRank(uint _index, uint _priceCandy, uint _priceEth) onlyCommunity public  {
+    function editRank(uint _index, uint _priceCandy, uint _priceEth) onlyManager public  {
         require(_index > 0 && _index <= ranksCount);
         if (_index > 1) {
             require(ranks[_index - 1].priceCandy <= _priceCandy && ranks[_index - 1].priceEth <= _priceEth);
@@ -722,8 +727,6 @@ contract UserRank is LandAccessControl, CanReceiveApproval {
     }
 
 
-    //TODO limits
-    //TODO нельзя перезадать ранк на понижение
     function getPreSaleRank(address _user, uint _index) onlyManager whilePresaleOpen public {
         require(_index <= ranksCount);
         require(userRanks[_user] < _index);
@@ -732,7 +735,7 @@ contract UserRank is LandAccessControl, CanReceiveApproval {
     }
 
 
-    //TODO ??
+
     function getNextRank(address _user) onlyUnicornContract public returns (uint) {
         uint _index = userRanks[_user] + 1;
         require(_index <= ranksCount);
@@ -1108,10 +1111,9 @@ contract CandyLand is ERC20, LandAccessControl, CanReceiveApproval {
     }
 
 
-    //TODO эта же функция у нас в бридинге!!!
     function setLandLimit() external onlyCommunity {
         require(totalSupply_ == MAX_SUPPLY);
-        MAX_SUPPLY = MAX_SUPPLY.add(valueFromPercent(totalSupply_, 1500));
+        MAX_SUPPLY = MAX_SUPPLY.add(1000);
         emit NewLandLimit(MAX_SUPPLY);
     }
 

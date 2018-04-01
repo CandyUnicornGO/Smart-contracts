@@ -2352,10 +2352,10 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
     //TODO ??
-    function setGen0Step(uint _step) external onlyCommunity {
-        gen0Step = _step;
-        emit NewGen0Step(gen0Limit);
-    }
+//    function setGen0Step(uint _step) external onlyCommunity {
+//        gen0Step = _step;
+//        emit NewGen0Step(gen0Limit);
+//    }
 
 
 
