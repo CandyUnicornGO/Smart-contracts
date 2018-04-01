@@ -290,15 +290,11 @@ contract LandManagement {
         presaleOpen = false;
     }
 
-    function stopFirstRankForFree() external onlyOwner {
-        require(firstRankForFree);
-        firstRankForFree = false;
+    function setFirstRankForFree(bool _firstRankForFree) external onlyOwner {
+        require(firstRankForFree != _firstRankForFree);
+        firstRankForFree = _firstRankForFree;
     }
 
-    function openFirstRankForFree() external onlyOwner {
-        require(!firstRankForFree);
-        firstRankForFree = true;
-    }
 
     //price in weis
     function setLandPrice(uint _price, uint _candyPrice) external onlyManager {
@@ -1252,28 +1248,38 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
         _buyLandForCandy(_owner, _count);
     }
 
+
+    function findRankByCount(uint _rank, uint _totalRanks, uint _balance, uint _count) internal view returns (uint, uint) {
+        uint landLimit = userRank.getRankLandLimit(_rank).sub(_balance);
+        if (_count > landLimit && _rank < _totalRanks) {
+            return findRankByCount(_rank + 1, _totalRanks, _balance,  _count);
+        }
+        return (_rank, landLimit);
+    }
+
     function getNeededRank(address _owner, uint _count) public view returns (uint neededRank) {
         require(_count > 0);
-        neededRank = userRank.getUserRank(_owner);
-        uint landLimit = userRank.getRankLandLimit(neededRank).sub(candyLand.balanceOf(_owner));
-
-        if (_count > landLimit) {
-            uint ranksCount = userRank.ranksCount();
-            if (neededRank < ranksCount) {
-                for(neededRank = neededRank + 1; neededRank <= ranksCount; neededRank++) {
-                    if (_count <= userRank.getRankLandLimit(neededRank).sub(candyLand.balanceOf(_owner)) ) {
-                        break;
-                    }
-                }
-            }
-        }
+        uint landLimit;
+        (neededRank, landLimit) = findRankByCount(
+                userRank.getUserRank(_owner),
+                userRank.ranksCount(),
+                candyLand.balanceOf(_owner),
+                _count
+            );
     }
 
 
-    function getBuyLandCost(address _owner, uint _count) public view returns (uint totalPrice){
+    function getBuyLandInfo(address _owner, uint _count) public view returns (uint, uint, uint){
         uint rank = userRank.getUserRank(_owner);
-        uint neededRank = getNeededRank(_owner, _count);
-        uint landLimit = userRank.getRankLandLimit(neededRank).sub(candyLand.balanceOf(_owner));
+        uint neededRank;
+        uint landLimit;
+        uint totalPrice;
+        (neededRank, landLimit) = findRankByCount(
+            rank,
+            userRank.ranksCount(),
+            candyLand.balanceOf(_owner),
+            _count
+        );
         uint landPriceCandy = landManagement.landPriceCandy();
 
         if (_count > landLimit) {
@@ -1285,33 +1291,20 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
             totalPrice = userRank.getIndividualPrice(_owner, neededRank);
         }
         totalPrice = totalPrice.add(_count.mul(landPriceCandy));
+        return (rank, neededRank, totalPrice);
     }
-
 
     function _buyLandForCandy(address _owner, uint _count) internal  {
         require(candyLand.totalSupply().add(_count) <= candyLand.MAX_SUPPLY());
+        uint rank;
+        uint neededRank;
+        uint totalPrice;
 
-        uint landPriceCandy = landManagement.landPriceCandy();
-
-        uint rank = userRank.getUserRank(_owner);
-        uint neededRank = getNeededRank(_owner, _count);
-        uint landLimit = userRank.getRankLandLimit(neededRank).sub(candyLand.balanceOf(_owner));
-        uint totalPrice = 0;
-
-        if (_count > landLimit) {
-            _count = landLimit;
-        }
-        require(_count > 0);
-
-        if (rank < neededRank) {
-            totalPrice = userRank.getIndividualPrice(_owner, neededRank);
-        }
-        totalPrice = totalPrice.add(_count.mul(landPriceCandy));
+        (rank, neededRank, totalPrice) = getBuyLandInfo(_owner, _count);
         require(candyToken.transferFrom(_owner, this, totalPrice));
         if (rank < neededRank) {
             userRank.getRank(_owner, neededRank);
         }
-
         candyLand.mint(_owner, _count);
         emit BuyLand(_owner,_count);
     }
