@@ -104,6 +104,7 @@ contract LandManagement {
 
     bool public ethLandSaleOpen = true;
     bool public presaleOpen = true;
+    bool public firstRankForFree = true;
 
 
     uint public landPriceWei = 2412000000000000000;
@@ -279,14 +280,24 @@ contract LandManagement {
         ethLandSaleOpen = false;
     }
 
+    function openLandEthSale() external onlyOwner {
+        require(!ethLandSaleOpen);
+        ethLandSaleOpen = true;
+    }
+
     function stopPresale() external onlyOwner {
         require(presaleOpen);
         presaleOpen = false;
     }
 
-    function openLandEthSale() external onlyOwner {
-        require(!ethLandSaleOpen);
-        ethLandSaleOpen = true;
+    function stopFirstRankForFree() external onlyOwner {
+        require(firstRankForFree);
+        firstRankForFree = false;
+    }
+
+    function openFirstRankForFree() external onlyOwner {
+        require(!firstRankForFree);
+        firstRankForFree = true;
     }
 
     //price in weis
@@ -321,6 +332,7 @@ interface LandManagementInterface {
 
     function paused() external view returns (bool);
     function presaleOpen() external view returns (bool);
+    function firstRankForFree() external view returns (bool);
 
     function ethLandSaleOpen() external view returns (bool);
 
@@ -640,16 +652,17 @@ contract UserRank is LandAccessControl, CanReceiveApproval {
         allowedFuncs[bytes4(keccak256("_receiveBuyNextRank(address)"))] = true;
         allowedFuncs[bytes4(keccak256("_receiveBuyRank(address,uint256)"))] = true;
 
-        addRank(1,   36000000000000000000,   10000000000000000,"rank1");
-        addRank(5,   144000000000000000000,  20000000000000000,"rank2");
-        addRank(10,  180000000000000000000,  30000000000000000,"rank3");
-        addRank(20,  360000000000000000000,  40000000000000000,"rank4");
-        addRank(50,  1080000000000000000000, 50000000000000000,"rank5");
-        addRank(100, 1800000000000000000000, 60000000000000000,"rank6");
-        addRank(200, 3600000000000000000000, 70000000000000000,"rank7");
-        addRank(400, 7200000000000000000000, 80000000000000000,"rank8");
-        addRank(650, 9000000000000000000000, 90000000000000000,"rank9");
-        addRank(1000,12600000000000000000000,100000000000000000,"rank10");
+        addRank(1,   36000000000000000000,   10000000000000000,"Cryptolord");
+        addRank(5,   144000000000000000000,  20000000000000000,"Forklord");
+        addRank(10,  180000000000000000000,  30000000000000000,"Decentralord");
+        addRank(20,  360000000000000000000,  40000000000000000,"Technomaster");
+        addRank(50,  1080000000000000000000, 50000000000000000,"Bitmaster");
+        addRank(100, 1800000000000000000000, 60000000000000000,"Megamaster");
+        addRank(200, 3600000000000000000000, 70000000000000000,"Cyberduke");
+        addRank(400, 7200000000000000000000, 80000000000000000,"Nanoprince");
+        addRank(650, 9000000000000000000000, 90000000000000000,"Hyperprince");
+        addRank(1000,12600000000000000000000,100000000000000000,"Ethercaesar");
+
 
     }
 
@@ -1206,7 +1219,8 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
                 */
                 _landAmount = _landAmount.add(userLandLimit);
                 weiAmount = weiAmount.sub(userLandLimit.mul(landPriceWei));
-                uint nextPrice = userRank.getRankPriceEth(i+1);
+
+                uint nextPrice = (i == 0 && landManagement.firstRankForFree()) ? 0 : userRank.getRankPriceEth(i+1);
 
                 if (i == ranksCount || weiAmount < nextPrice) {
                     break;
@@ -1218,6 +1232,7 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
 
         }
 
+        require(_landAmount > 0);
         candyLand.mint(msg.sender,_landAmount);
 
         emit BuyLand(msg.sender,_landAmount);
@@ -1271,6 +1286,7 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
         }
         totalPrice = totalPrice.add(_count.mul(landPriceCandy));
     }
+
 
     function _buyLandForCandy(address _owner, uint _count) internal  {
         require(candyLand.totalSupply().add(_count) <= candyLand.MAX_SUPPLY());
