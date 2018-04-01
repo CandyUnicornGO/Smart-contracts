@@ -809,7 +809,7 @@ contract UserRank is LandAccessControl, CanReceiveApproval {
 
     function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public {
         //require(_token == landManagement.candyToken());
-        require(msg.sender == landManagement.candyToken());
+        require(msg.sender == address(candyToken));
         require(allowedFuncs[bytesToBytes4(_extraData)]);
         require(address(this).call(_extraData));
         emit ReceiveApproval(_from, _value, _token);
@@ -1126,7 +1126,7 @@ contract CandyLand is ERC20, LandAccessControl, CanReceiveApproval {
 
     function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public {
         //require(_token == landManagement.candyToken());
-        require(msg.sender == landManagement.candyToken());
+        require(msg.sender == address(candyToken));
         require(allowedFuncs[bytesToBytes4(_extraData)]);
         require(address(this).call(_extraData));
         emit ReceiveApproval(_from, _value, _token);
@@ -1374,7 +1374,7 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
 
     function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public {
         //require(_token == landManagement.candyToken());
-        require(msg.sender == landManagement.candyToken());
+        require(msg.sender == address(candyToken));
         require(allowedFuncs[bytesToBytes4(_extraData)]);
         require(address(this).call(_extraData));
         emit ReceiveApproval(_from, _value, _token);
