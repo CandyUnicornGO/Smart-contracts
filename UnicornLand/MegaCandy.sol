@@ -247,7 +247,7 @@ contract LandManagement {
     }
 
 
-    //TODO lock ???
+
     function setUserRank(address _userRankAddress) external onlyOwner whenPaused whenUnlocked {
         require(_userRankAddress != address(0));
         userRankAddress = _userRankAddress;
@@ -530,7 +530,7 @@ contract StandardToken is ERC20 {
 }
 
 
-contract MagaCandy is StandardToken, LandAccessControl {
+contract MegaCandy is StandardToken, LandAccessControl {
 
     string public constant name = "Unicorn Mega Candy"; // solium-disable-line uppercase
     string public constant symbol = "Mega"; // solium-disable-line uppercase
@@ -542,7 +542,7 @@ contract MagaCandy is StandardToken, LandAccessControl {
     //uint256 public constant INITIAL_SUPPLY = 1000000000 * (10 ** uint256(decimals));
 
 
-    function MagaCandy(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
+    function MegaCandy(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
     }
 
     function init() onlyLandManagement whenPaused external view {
@@ -596,7 +596,6 @@ contract CanReceiveApproval {
     mapping (bytes4 => bool) allowedFuncs;
 
     modifier onlyPayloadSize(uint numwords) {
-        //TODO  == || >= ?? =)
         assert(msg.data.length >= numwords * 32 + 4);
         _;
     }
@@ -646,17 +645,18 @@ contract UserRank is LandAccessControl, CanReceiveApproval {
 
         allowedFuncs[bytes4(keccak256("_receiveBuyNextRank(address)"))] = true;
         allowedFuncs[bytes4(keccak256("_receiveBuyRank(address,uint256)"))] = true;
+        //3350000000000000 for candy
 
-        addRank(1,   36000000000000000000,   10000000000000000,"Cryptolord");
-        addRank(5,   144000000000000000000,  20000000000000000,"Forklord");
-        addRank(10,  180000000000000000000,  30000000000000000,"Decentralord");
-        addRank(20,  360000000000000000000,  40000000000000000,"Technomaster");
-        addRank(50,  1080000000000000000000, 50000000000000000,"Bitmaster");
-        addRank(100, 1800000000000000000000, 60000000000000000,"Megamaster");
-        addRank(200, 3600000000000000000000, 70000000000000000,"Cyberduke");
-        addRank(400, 7200000000000000000000, 80000000000000000,"Nanoprince");
-        addRank(650, 9000000000000000000000, 90000000000000000,"Hyperprince");
-        addRank(1000,12600000000000000000000,100000000000000000,"Ethercaesar");
+        addRank(1,   36000000000000000000,   120600000000000000,"Cryptolord");
+        addRank(5,   144000000000000000000,  482400000000000000,"Forklord");
+        addRank(10,  180000000000000000000,  603000000000000000,"Decentralord");
+        addRank(20,  360000000000000000000,  1206000000000000000,"Technomaster");
+        addRank(50,  1080000000000000000000, 3618000000000000000,"Bitmaster");
+        addRank(100, 1800000000000000000000, 6030000000000000000,"Megamaster");
+        addRank(200, 3600000000000000000000, 12060000000000000000,"Cyberduke");
+        addRank(400, 7200000000000000000000, 24120000000000000000,"Nanoprince");
+        addRank(650, 9000000000000000000000, 30150000000000000000,"Hyperprince");
+        addRank(1000,12600000000000000000000,42210000000000000000,"Ethercaesar");
 
 
     }
@@ -873,9 +873,9 @@ contract CandyLand is ERC20, LandAccessControl, CanReceiveApproval {
     uint256 totalSupply_;
     uint256 public MAX_SUPPLY = 30000;
 
-    uint public constant plantedTime = 5 minutes;
+    uint public constant plantedTime = 1 hours;
     uint public constant plantedRate = 1 ether;
-    uint public constant priceRate = 1 ether;
+    //uint public constant priceRate = 1 ether;
 
     mapping(address => uint256) balances;
     mapping(address => mapping (address => uint256)) internal allowed;
@@ -910,10 +910,10 @@ contract CandyLand is ERC20, LandAccessControl, CanReceiveApproval {
     function CandyLand(address _landManagementAddress) LandAccessControl(_landManagementAddress) public {
         allowedFuncs[bytes4(keccak256("_receiveMakePlant(address,uint256,uint256)"))] = true;
 
-        //TODO 1 сутки - 0,7 Candy
-        addGardener(10,3000000000000000000);
-        addGardener(15,5000000000000000000);
-        addGardener(30,12000000000000000000);
+        addGardener(24,   700000000000000000);
+        addGardener(120, 3000000000000000000);
+        addGardener(240, 5000000000000000000);
+        addGardener(720,12000000000000000000);
     }
 
 
@@ -1097,7 +1097,7 @@ contract CandyLand is ERC20, LandAccessControl, CanReceiveApproval {
         emit GetCrop(msg.sender, _gardenId, crop);
     }
 
-    //todo ?? period in hours
+
     function addGardener(uint _period, uint _price) onlyOwner public  {
         gardeners[++gardenerId] = Gardener({
             period: _period * 1 hours,
@@ -1160,8 +1160,7 @@ contract CandyLandInterface is ERC20 {
     function MAX_SUPPLY() external view returns (uint);
 }
 
-//TODO list of gardens
-//TODO ?? PAUSE
+
 //TODO marketplace
 contract CandyLandSale is LandAccessControl, CanReceiveApproval {
     using SafeMath for uint256;

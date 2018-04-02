@@ -2148,7 +2148,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     //counter for gen0
     uint public gen0Limit = 30000;
-    uint public gen0Count = 0;
+    uint public gen0Count = 839;
     uint public gen0Step = 1000;
 
     //counter for presale gen0
