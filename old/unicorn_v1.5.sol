@@ -2295,17 +2295,17 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
     //change freezing time for megacandy
-    function minusFreezingTime(uint _unicornId) public {
+    function minusFreezingTime(uint _unicornId, uint _count) public {
         //require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subFreezingPrice()));
-        require(megaCandyToken.burn(msg.sender,   unicornManagement.subFreezingPrice()));
-        unicornToken.minusFreezingTime(_unicornId, unicornManagement.subFreezingTime());
+        require(megaCandyToken.burn(msg.sender,   unicornManagement.subFreezingPrice().mul(_count)));
+        unicornToken.minusFreezingTime(_unicornId,  unicornManagement.subFreezingTime() * uint64(_count));
     }
 
     //change tour freezing time for megacandy
-    function minusTourFreezingTime(uint _unicornId) public {
+    function minusTourFreezingTime(uint _unicornId, uint _count) public {
         //require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subTourFreezingPrice()));
-        require(megaCandyToken.burn(msg.sender, unicornManagement.subTourFreezingPrice()));
-        unicornToken.minusTourFreezingTime(_unicornId, unicornManagement.subTourFreezingTime());
+        require(megaCandyToken.burn(msg.sender, unicornManagement.subTourFreezingPrice().mul(_count)));
+        unicornToken.minusTourFreezingTime(_unicornId, unicornManagement.subTourFreezingTime() * uint64(_count));
     }
 
     function getHybridizationPrice(uint _unicornId) public view returns (uint) {
