@@ -153,21 +153,15 @@ contract LandManagement {
 
     function LandManagement(address _unicornManagementAddress) public {
         unicornManagement = UnicornManagementInterface(_unicornManagementAddress);
-        //        unicornManagement.registerInit(this);
+        unicornManagement.registerInit(this);
     }
 
 
-    //    function init() onlyUnicornManagement whenPaused external {
-    //        ownerAddress = unicornManagement.ownerAddress();
-    //        managerAddress = unicornManagement.managerAddress();
-    //        communityAddress = unicornManagement.communityAddress();
-    //        walletAddress = unicornManagement.walletAddress();
-    //        candyToken = unicornManagement.candyToken();
-    //        megaCandyToken = unicornManagement.candyPowerToken();
-    //        dividendManagerAddress = unicornManagement.dividendManagerAddress();
-    //        //unicornTokenAddress = unicornManagement.unicornTokenAddress();
-    //        //setUnicornContract(unicornManagement.unicornBreedingAddress());
-    //    }
+    function init() onlyUnicornManagement whenPaused external {
+        for(uint i = 0; i < initList.length; i++) {
+            LandInit(initList[i]).init();
+        }
+    }
 
 
     struct InitItem {
