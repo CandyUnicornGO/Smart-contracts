@@ -181,7 +181,7 @@ contract BlackBoxController is UnicornAccessControl  {
 
     function oracleCallback(uint unicornId, string gene) external {
         require(msg.sender == ownOracle);
-        require(unicornToken.setGene(unicornId, bytes(gene)));
+        unicornToken.setGene(unicornId, bytes(gene));
     }
 
     function oracleRequest() internal {
