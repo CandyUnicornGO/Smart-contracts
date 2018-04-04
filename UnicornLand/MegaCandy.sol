@@ -1265,7 +1265,7 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
         return (_rank, landLimit);
     }
 
-    function getNeededRank(address _owner, uint _count) public view returns (uint neededRank) {
+    function getNeededRank(address _owner, uint _count) internal view returns (uint neededRank) {
         require(_count > 0);
         uint landLimit;
         (neededRank, landLimit) = findRankByCount(
@@ -1288,6 +1288,7 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
             candyLand.balanceOf(_owner),
             _count
         );
+
         uint landPriceCandy = landManagement.landPriceCandy();
 
         if (_count > landLimit) {
@@ -1297,7 +1298,11 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
 
         if (rank < neededRank) {
             totalPrice = userRank.getIndividualPrice(_owner, neededRank);
+            if (rank == 0 && landManagement.firstRankForFree()) {
+                totalPrice = totalPrice.sub(userRank.getRankPriceCandy(1));
+            }
         }
+
         totalPrice = totalPrice.add(_count.mul(landPriceCandy));
         return (rank, neededRank, totalPrice);
     }
