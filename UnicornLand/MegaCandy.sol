@@ -1265,6 +1265,7 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
         return (_rank, landLimit);
     }
 
+ 
     
 
     function getNeededRank(address _owner, uint _count) public view returns (uint neededRank) {
@@ -1277,6 +1278,18 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
                 _count
             );
     }
+
+    //    function getNeededRank(address _owner, uint _count) internal view returns (uint neededRank) {
+    //        require(_count > 0);
+    //        uint landLimit;
+    //        (neededRank, landLimit) = findRankByCount(
+    //                userRank.getUserRank(_owner),
+    //                userRank.ranksCount(),
+    //                candyLand.balanceOf(_owner),
+    //                _count
+    //            );
+    //    }
+
 
 
     function getBuyLandInfo(address _owner, uint _count) public view returns (uint, uint, uint){
@@ -1304,8 +1317,8 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
                 totalPrice = totalPrice.sub(userRank.getRankPriceCandy(1));
             }
         }
-
         totalPrice = totalPrice.add(_count.mul(landPriceCandy));
+
         return (rank, neededRank, totalPrice);
     }
 
