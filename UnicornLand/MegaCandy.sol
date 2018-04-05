@@ -1265,7 +1265,9 @@ contract CandyLandSale is LandAccessControl, CanReceiveApproval {
         return (_rank, landLimit);
     }
 
-    function getNeededRank(address _owner, uint _count) internal view returns (uint neededRank) {
+    
+
+    function getNeededRank(address _owner, uint _count) public view returns (uint neededRank) {
         require(_count > 0);
         uint landLimit;
         (neededRank, landLimit) = findRankByCount(
