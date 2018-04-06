@@ -124,6 +124,7 @@ contract BlackBoxController is UnicornAccessControl  {
 
 
     function BlackBoxController(address _unicornManagementAddress, address _familyTreeAddress) UnicornAccessControl(_unicornManagementAddress) public {
+        require(_familyTreeAddress != address(0));
         familyTree = UnicornFamilyTree(_familyTreeAddress);
     }
 
