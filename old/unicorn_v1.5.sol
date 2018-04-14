@@ -1,4 +1,3 @@
-
 pragma solidity ^0.4.21;
 
 contract OraclizeI {
@@ -2126,7 +2125,7 @@ contract UnicornBreeding is UnicornAccessControl {
     BlackBoxInterface public blackBox;
 
     event HybridizationAdd(uint indexed unicornId, uint price);
-    event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId);
+    event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price);
     event HybridizationDelete(uint indexed unicornId);
     event FundsTransferred(address dividendManager, uint value);
     event CreateUnicorn(address indexed owner, uint indexed unicornId, uint parent1, uint  parent2);
@@ -2136,7 +2135,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     event OfferAdd(uint256 indexed unicornId, uint priceEth, uint priceCandy);
     event OfferDelete(uint256 indexed unicornId);
-    event UnicornSold(uint256 indexed unicornId);
+    event UnicornSold(uint256 indexed unicornId, uint price, string currency);
 
     event NewSellDividendPercent(uint percentCandy, uint percentCandyEth);
 
@@ -2219,7 +2218,7 @@ contract UnicornBreeding is UnicornAccessControl {
         if (hybridizations[_firstUnicornId].price > 0) {
             candyToken.transfer(unicornToken.ownerOf(_firstUnicornId), hybridizations[_firstUnicornId].price);
         }
-        emit HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId);
+        emit HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId, hybridizations[_firstUnicornId].price);
         _deleteHybridization(_firstUnicornId);
     }
 
@@ -2288,10 +2287,20 @@ contract UnicornBreeding is UnicornAccessControl {
 
     function plusFreezingTime(uint _unicornId) private {
         unicornToken.plusFreezingTime(_unicornId);
+
+        if (unicornToken.getUnicornGenByte(_unicornId, 163) == 7) {
+            uint64  _time = 18446744073709551615 - 167 hours;
+            unicornToken.minusFreezingTime(_unicornId,_time);
+        }
     }
 
     function plusTourFreezingTime(uint _unicornId) onlyTournament public {
         unicornToken.plusTourFreezingTime(_unicornId);
+
+        if (unicornToken.getUnicornGenByte(_unicornId, 168) == 7) {
+            uint64  _time = 18446744073709551615 - 167 hours;
+            unicornToken.minusTourFreezingTime(_unicornId,_time);
+        }
     }
 
     //change freezing time for megacandy
@@ -2327,13 +2336,8 @@ contract UnicornBreeding is UnicornAccessControl {
 
 
     function withdrawTokens() onlyManager public {
-        require(candyToken.balanceOf(this) > 0/* || candyPowerToken.balanceOf(this) > 0*/);
-        //        if (candyToken.balanceOf(this) > 0) {
+        require(candyToken.balanceOf(this) > 0);
         candyToken.transfer(unicornManagement.walletAddress(), candyToken.balanceOf(this));
-        //        }
-        /*if (candyPowerToken.balanceOf(this) > 0) {
-            candyPowerToken.transfer(unicornManagement.walletAddress(), candyPowerToken.balanceOf(this));
-        }*/
     }
 
 
@@ -2406,7 +2410,8 @@ contract UnicornBreeding is UnicornAccessControl {
 
         address owner = unicornToken.ownerOf(_unicornId);
 
-        emit UnicornSold(_unicornId);
+        //TODO ?? или просто индекс передавать 0 - эфир. 1 - кенди?
+        emit UnicornSold(_unicornId, price,'ETH');
         //deleteoffer вызовется внутри transfer
         unicornToken.marketTransfer(owner, msg.sender, _unicornId);
         owner.transfer(price);
@@ -2428,7 +2433,7 @@ contract UnicornBreeding is UnicornAccessControl {
             candyToken.transfer(owner, price);
         }
 
-        emit UnicornSold(_unicornId);
+        emit UnicornSold(_unicornId, price,'Candy');
         //deleteoffer вызовется внутри transfer
         unicornToken.marketTransfer(owner, msg.sender, _unicornId);
     }
