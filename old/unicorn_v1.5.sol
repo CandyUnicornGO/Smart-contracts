@@ -2157,8 +2157,6 @@ contract UnicornBreeding is UnicornAccessControl {
     struct Hybridization{
         uint listIndex;
         uint price;
-        //        uint second_unicorn_id;
-        //        bool accepted;
         bool exists;
     }
 
@@ -2166,6 +2164,33 @@ contract UnicornBreeding is UnicornAccessControl {
     mapping (uint => Hybridization) public hybridizations;
     mapping(uint => uint) public hybridizationList;
     uint public hybridizationListSize = 0;
+
+
+    uint8 maxFreezingIndex = 8;
+    uint32[8] internal freezing = [
+    uint32(1 hours),    //1 hour
+    uint32(2 hours),    //2 - 4 hours
+    uint32(8 hours),    //8 - 12 hours
+    uint32(16 hours),   //16 - 24 hours
+    uint32(36 hours),   //36 - 48 hours
+    uint32(72 hours),   //72 - 96 hours
+    uint32(120 hours),  //120 - 144 hours
+    uint32(168 hours)   //168 hours
+    ];
+
+    //count for random plus from 0 to ..
+    uint32[8] internal freezingPlusCount = [
+    0, 3, 5, 9, 13, 25, 25, 0
+    ];
+
+
+    struct UnicornFreez {
+        uint index;
+        uint hybridizationsCount;
+        uint exists;
+    }
+
+    mapping (uint => UnicornFreez) public unicornsFreez;
 
 
     function() public payable {
@@ -2243,11 +2268,6 @@ contract UnicornBreeding is UnicornAccessControl {
         }
     }
 
-    // Gets the list of hybridizations of unicorn
-    //    function hybridizationsOf(uint _unicornId) public view returns (uint256[]) {
-    //        return unicornHybridizations[_unicornId];
-    //    }
-
 
     //Create new 0 gen
     function createUnicorn() public payable whenNotPaused returns(uint256)   {
@@ -2286,11 +2306,52 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
     function plusFreezingTime(uint _unicornId) private {
+        //потому что не сможем минусовать если в фриз < now
         unicornToken.plusFreezingTime(_unicornId);
 
-        if (unicornToken.getUnicornGenByte(_unicornId, 163) == 7) {
+        uint8 freezIndex = unicornToken.getUnicornGenByte(_unicornId, 163);
+
+        //если 7 индекс то можно ничего не считать =)
+        if (freezIndex == 7) {
             uint64  _time = 18446744073709551615 - 167 hours;
             unicornToken.minusFreezingTime(_unicornId,_time);
+        } else {
+            //если еще не был на спаривании
+            //наверное имеет смысл вынести за if чтобы все хранились, даже те у которых в гене 7
+            if (!unicornsFreez[_unicornId].exists) {
+                unicornsFreez[_unicornId].exists = true;
+                unicornsFreez[_unicornId].index = freezIndex;
+                unicornsFreez[_unicornId].hybridizationsCount = 0;
+            }
+
+            //если меньше 3 спарок увеличиваю просто спарки, если 3 тогда увеличиваю индекс
+            if (unicornsFreez[_unicornId].hybridizationsCount < 3) {
+                unicornsFreez[_unicornId].hybridizationsCount++;
+            } else {
+                if (unicornsFreez[_unicornId].index < maxFreezingIndex-1) {
+                    unicornsFreez[_unicornId].index++;
+                    unicornsFreez[_unicornId].hybridizationsCount = 0;
+                }
+            }
+
+            //как и раньше рендомно для индекса получаем время
+            uint64 freezTime = uint64(_getFreezeTime(unicornsFreez[_unicornId].index));
+
+            //zero для того чтобы обнулить то что уже начислили в plusFreezingTime
+            uint64 zero = uint64(now) - unicornToken.unicorns[_unicornId].freezingEndTime;
+            uint64  _time = 18446744073709551615 + zero - freezTime;
+            unicornToken.minusFreezingTime(_unicornId,_time);
+
+        }
+    }
+
+ 
+
+    function _getFreezeTime(uint freezingIndex) internal view returns (uint time) {
+        freezingIndex %= maxFreezingIndex;
+        time = freezing[freezingIndex];
+        if (freezingPlusCount[freezingIndex] != 0) {
+            time += (uint(block.blockhash(block.number - 1)) % freezingPlusCount[freezingIndex]) * 1 hours;
         }
     }
 
