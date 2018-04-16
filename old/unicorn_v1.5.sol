@@ -2126,6 +2126,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     event HybridizationAdd(uint indexed unicornId, uint price);
     event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price);
+    event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId);
     event HybridizationDelete(uint indexed unicornId);
     event FundsTransferred(address dividendManager, uint value);
     event CreateUnicorn(address indexed owner, uint indexed unicornId, uint parent1, uint  parent2);
@@ -2140,12 +2141,14 @@ contract UnicornBreeding is UnicornAccessControl {
     event FreeHybridization(uint256 indexed unicornId);
 
     event NewSellDividendPercent(uint percentCandy, uint percentCandyEth);
+    event NewSelfHybridizationPrice(uint percentCandy);
 
     ERC20 public candyToken;
     megaCandyInterface public megaCandyToken;
 
     uint public sellDividendPercentCandy = 375; //OnlyManager 4 digits. 10.5% = 1050
     uint public sellDividendPercentEth = 375; //OnlyManager 4 digits. 10.5% = 1050
+    uint public selfHybridizationPrice = 0;
 
     //counter for gen0
     uint public gen0Limit = 30000;
@@ -2168,7 +2171,6 @@ contract UnicornBreeding is UnicornAccessControl {
     uint public hybridizationListSize = 0;
 
 
-    //    uint8 maxFreezingIndex = 8;
     uint32[8] internal freezing = [
     uint32(1 hours),    //1 hour
     uint32(2 hours),    //2 - 4 hours
@@ -2189,7 +2191,9 @@ contract UnicornBreeding is UnicornAccessControl {
     struct UnicornFreeze {
         uint index;
         uint hybridizationsCount;
-        uint exists;
+        uint priceRate;
+        bool mustCalculate;
+        bool exists;
     }
 
     mapping (uint => UnicornFreeze) public unicornsFreeze;
@@ -2254,6 +2258,29 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
 
+
+    function selfHybridization(uint _firstUnicornId, uint _secondUnicornId) whenNotPaused public payable {
+        require(unicornToken.owns(msg.sender, _firstUnicornId) && unicornToken.owns(msg.sender, _secondUnicornId));
+        require(_secondUnicornId != _firstUnicornId);
+        require(unicornToken.isUnfreezed(_firstUnicornId) && unicornToken.isUnfreezed(_secondUnicornId));
+
+        require(msg.value == unicornManagement.oraclizeFee());
+        if (selfHybridizationPrice > 0) {
+            require(candyToken.transferFrom(msg.sender, this, selfHybridizationPrice));
+        }
+
+        plusFreezingTime(_firstUnicornId);
+        plusFreezingTime(_secondUnicornId);
+        uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
+        blackBox.geneCore.value(unicornManagement.oraclizeFee())(newUnicornId, _firstUnicornId, _secondUnicornId);
+        emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
+
+        emit SelfHybridization(_firstUnicornId, _secondUnicornId, newUnicornId);
+
+    }
+
+
+
     function cancelHybridization (uint _unicornId) public {
         require(unicornToken.owns(msg.sender,_unicornId));
         require(hybridizations[_unicornId].exists);
@@ -2311,24 +2338,25 @@ contract UnicornBreeding is UnicornAccessControl {
         return newUnicornId;
     }
 
+
     function plusFreezingTime(uint _unicornId) private {
         //потому что не сможем минусовать если в фриз < now
         unicornToken.plusFreezingTime(_unicornId);
 
         uint8 freezIndex = unicornToken.getUnicornGenByte(_unicornId, 163);
 
+        if (!unicornsFreeze[_unicornId].exists) {
+            unicornsFreeze[_unicornId].exists = true;
+            unicornsFreeze[_unicornId].mustCalculate = true;
+            unicornsFreeze[_unicornId].index = freezIndex;
+            unicornsFreeze[_unicornId].hybridizationsCount = 0;
+        }
+
         //если 7 индекс то можно ничего не считать =)
         if (freezIndex == 7) {
             uint64 _time = unicornToken.unicorns[_unicornId].freezingEndTime - now - freezing[7];
             unicornToken.minusFreezingTime(_unicornId,_time);
         } else {
-            //если еще не был на спаривании
-            //наверное имеет смысл вынести за if чтобы все хранились, даже те у которых в гене 7
-            if (!unicornsFreeze[_unicornId].exists) {
-                unicornsFreeze[_unicornId].exists = true;
-                unicornsFreeze[_unicornId].index = freezIndex;
-                unicornsFreeze[_unicornId].hybridizationsCount = 0;
-            }
 
             //если меньше 3 спарок увеличиваю просто спарки, если 3 тогда увеличиваю индекс
             //TODO ?? вынести количество спарок вынести в переменную
@@ -2338,6 +2366,7 @@ contract UnicornBreeding is UnicornAccessControl {
                 if (unicornsFreeze[_unicornId].index < freezing.length - 1) {
                     unicornsFreeze[_unicornId].index++;
                     unicornsFreeze[_unicornId].hybridizationsCount = 0;
+                    unicornsFreeze[_unicornId].mustCalculate = true;
                 }
             }
 
@@ -2346,17 +2375,49 @@ contract UnicornBreeding is UnicornAccessControl {
             unicornToken.minusFreezingTime(_unicornId,_time);
 
         }
+
+
+        if (unicornsFreeze[_unicornId].mustCalculate) {
+            _calculateMinusFreezePriceRate(_unicornId);
+        }
     }
 
+    /*
+       (сумма генов + количество часов заморозки)/количество часов заморозки = стоимость снятия 1го часа заморозки в MegaCandy
+    */
+    function _calculateMinusFreezePriceRate(uint _unicornId) internal {
+        unicornsFreeze[_unicornId].mustCalculate = false;
+        //TODO ?? может записывать в структуру эту сумму? она ведь всегда не изменна
+        uint bytesSumm = _getBytesSumm(_unicornId);
+        uint hoursCount = freezing[unicornsFreeze[_unicornId].index] / 1 hours;
+        uint rate = bytesSumm.add(hoursCount).mul(100);
+        unicornsFreeze[_unicornId].priceRate = rate.div(hoursCount);
+    }
+
+
+    function _getBytesSumm(uint _unicornId) internal returns (uint) {
+        return 10;
+    }
+
+
+    function updateFreezePriceRate(uint _unicornId) onlyGeneLab external {
+        unicornsFreeze[_unicornId].mustCalculate = true;
+    }
+
+    function getFreezePriceRate(uint _unicornId) external returns (uint) {
+        return unicornManagement.subFreezingPrice().mul(unicornsFreeze[_unicornId].priceRate).div(100);
+    }
+
+
     function _getFreezeTime(uint freezingIndex) internal view returns (uint time) {
-        //в общем она нахрен не нужна, все равно internal
-        //        freezingIndex %= maxFreezingIndex;
         time = freezing[freezingIndex];
         if (freezingPlusCount[freezingIndex] != 0) {
             time += (uint(block.blockhash(block.number - 1)) % freezingPlusCount[freezingIndex]) * 1 hours;
         }
     }
 
+
+    //TODO по новой схеме)
     function plusTourFreezingTime(uint _unicornId) onlyTournament public {
         unicornToken.plusTourFreezingTime(_unicornId);
         if (unicornToken.getUnicornGenByte(_unicornId, 168) == 7) {
@@ -2367,17 +2428,18 @@ contract UnicornBreeding is UnicornAccessControl {
 
     //change freezing time for megacandy
     function minusFreezingTime(uint _unicornId, uint _count) public {
-        //require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subFreezingPrice()));
-        require(megaCandyToken.burn(msg.sender,   unicornManagement.subFreezingPrice().mul(_count)));
+        uint price =  unicornManagement.subFreezingPrice().mul(unicornsFreeze[_unicornId].priceRate).div(100);
+        require(megaCandyToken.burn(msg.sender, price.mul(_count)));
         unicornToken.minusFreezingTime(_unicornId,  unicornManagement.subFreezingTime() * uint64(_count));
     }
 
     //change tour freezing time for megacandy
     function minusTourFreezingTime(uint _unicornId, uint _count) public {
-        //require(candyPowerToken.transferFrom(msg.sender, this, unicornManagement.subTourFreezingPrice()));
-        require(megaCandyToken.burn(msg.sender, unicornManagement.subTourFreezingPrice().mul(_count)));
+        uint price =  unicornManagement.subTourFreezingPrice().mul(unicornsFreeze[_unicornId].priceRate).div(100);
+        require(megaCandyToken.burn(msg.sender, price.mul(_count)));
         unicornToken.minusTourFreezingTime(_unicornId, unicornManagement.subTourFreezingTime() * uint64(_count));
     }
+
 
     function getHybridizationPrice(uint _unicornId) public view returns (uint) {
         return unicornManagement.getHybridizationFullPrice(hybridizations[_unicornId].price);
@@ -2459,7 +2521,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
         emit OfferAdd(_unicornId, _priceEth, _priceCandy);
         //налетай)
-        if (_priceEth == 0 && _priceCandy) {
+        if (_priceEth == 0 && _priceCandy == 0) {
             emit FreeOffer(_unicornId);
         }
 
@@ -2477,8 +2539,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
         address owner = unicornToken.ownerOf(_unicornId);
 
-        //TODO ?? просто передавать две цены
-        emit UnicornSold(_unicornId, price, Currency.Eth);
+        emit UnicornSold(_unicornId, price, 0);
         //deleteoffer вызовется внутри transfer
         unicornToken.marketTransfer(owner, msg.sender, _unicornId);
         owner.transfer(price);
@@ -2499,8 +2560,8 @@ contract UnicornBreeding is UnicornAccessControl {
             require(candyToken.transferFrom(msg.sender, this, getOfferPriceCandy(_unicornId)));
             candyToken.transfer(owner, price);
         }
-        //TODO ?? просто передавать две цены
-        emit UnicornSold(_unicornId, price, Currency.Candy);
+
+        emit UnicornSold(_unicornId, 0, price);
         //deleteoffer вызовется внутри transfer
         unicornToken.marketTransfer(owner, msg.sender, _unicornId);
     }
@@ -2546,6 +2607,12 @@ contract UnicornBreeding is UnicornAccessControl {
         sellDividendPercentCandy = _percentCandy;
         sellDividendPercentEth = _percentEth;
         emit NewSellDividendPercent(_percentCandy, _percentEth);
+    }
+
+
+    function setSelfHybridizationPrice(uint _percentCandy) public onlyManager {
+        selfHybridizationPrice = _percentCandy;
+        emit NewSelfHybridizationPrice(_percentCandy);
     }
 
 
