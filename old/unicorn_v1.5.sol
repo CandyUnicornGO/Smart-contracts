@@ -2135,7 +2135,9 @@ contract UnicornBreeding is UnicornAccessControl {
 
     event OfferAdd(uint256 indexed unicornId, uint priceEth, uint priceCandy);
     event OfferDelete(uint256 indexed unicornId);
-    event UnicornSold(uint256 indexed unicornId, uint price, string currency);
+    event UnicornSold(uint256 indexed unicornId, uint priceEth, uint priceCandy);
+    event FreeOffer(uint256 indexed unicornId);
+    event FreeHybridization(uint256 indexed unicornId);
 
     event NewSellDividendPercent(uint percentCandy, uint percentCandyEth);
 
@@ -2166,7 +2168,7 @@ contract UnicornBreeding is UnicornAccessControl {
     uint public hybridizationListSize = 0;
 
 
-    uint8 maxFreezingIndex = 8;
+    //    uint8 maxFreezingIndex = 8;
     uint32[8] internal freezing = [
     uint32(1 hours),    //1 hour
     uint32(2 hours),    //2 - 4 hours
@@ -2184,13 +2186,13 @@ contract UnicornBreeding is UnicornAccessControl {
     ];
 
 
-    struct UnicornFreez {
+    struct UnicornFreeze {
         uint index;
         uint hybridizationsCount;
-        bool exists;
+        uint exists;
     }
 
-    mapping (uint => UnicornFreez) public unicornsFreez;
+    mapping (uint => UnicornFreeze) public unicornsFreeze;
 
 
     function() public payable {
@@ -2221,6 +2223,10 @@ contract UnicornBreeding is UnicornAccessControl {
         hybridizationList[hybridizationListSize++] = _unicornId;
 
         emit HybridizationAdd(_unicornId, _price);
+        //свободная касса)
+        if (_price == 0) {
+            emit FreeHybridization(_unicornId);
+        }
     }
 
 
@@ -2313,42 +2319,38 @@ contract UnicornBreeding is UnicornAccessControl {
 
         //если 7 индекс то можно ничего не считать =)
         if (freezIndex == 7) {
-            uint64  _time = 18446744073709551615 - 167 hours;
+            uint64 _time = unicornToken.unicorns[_unicornId].freezingEndTime - now - freezing[7];
             unicornToken.minusFreezingTime(_unicornId,_time);
         } else {
             //если еще не был на спаривании
             //наверное имеет смысл вынести за if чтобы все хранились, даже те у которых в гене 7
-            if (!unicornsFreez[_unicornId].exists) {
-                unicornsFreez[_unicornId].exists = true;
-                unicornsFreez[_unicornId].index = freezIndex;
-                unicornsFreez[_unicornId].hybridizationsCount = 0;
+            if (!unicornsFreeze[_unicornId].exists) {
+                unicornsFreeze[_unicornId].exists = true;
+                unicornsFreeze[_unicornId].index = freezIndex;
+                unicornsFreeze[_unicornId].hybridizationsCount = 0;
             }
 
             //если меньше 3 спарок увеличиваю просто спарки, если 3 тогда увеличиваю индекс
-            if (unicornsFreez[_unicornId].hybridizationsCount < 3) {
-                unicornsFreez[_unicornId].hybridizationsCount++;
+            //TODO ?? вынести количество спарок вынести в переменную
+            if (unicornsFreeze[_unicornId].hybridizationsCount < 3) {
+                unicornsFreeze[_unicornId].hybridizationsCount++;
             } else {
-                if (unicornsFreez[_unicornId].index < maxFreezingIndex-1) {
-                    unicornsFreez[_unicornId].index++;
-                    unicornsFreez[_unicornId].hybridizationsCount = 0;
+                if (unicornsFreeze[_unicornId].index < freezing.length - 1) {
+                    unicornsFreeze[_unicornId].index++;
+                    unicornsFreeze[_unicornId].hybridizationsCount = 0;
                 }
             }
 
             //как и раньше рендомно для индекса получаем время
-            uint64 freezTime = uint64(_getFreezeTime(unicornsFreez[_unicornId].index));
-
-            //zero для того чтобы обнулить то что уже начислили в plusFreezingTime
-            uint64 zero = uint64(now) - unicornToken.unicorns[_unicornId].freezingEndTime;
-            uint64  _time = 18446744073709551615 + zero - freezTime;
+            uint64 _time = unicornToken.unicorns[_unicornId].freezingEndTime - now - uint64(_getFreezeTime(unicornsFreeze[_unicornId].index));
             unicornToken.minusFreezingTime(_unicornId,_time);
 
         }
     }
 
-
-
     function _getFreezeTime(uint freezingIndex) internal view returns (uint time) {
-        freezingIndex %= maxFreezingIndex;
+        //в общем она нахрен не нужна, все равно internal
+        //        freezingIndex %= maxFreezingIndex;
         time = freezing[freezingIndex];
         if (freezingPlusCount[freezingIndex] != 0) {
             time += (uint(block.blockhash(block.number - 1)) % freezingPlusCount[freezingIndex]) * 1 hours;
@@ -2357,10 +2359,9 @@ contract UnicornBreeding is UnicornAccessControl {
 
     function plusTourFreezingTime(uint _unicornId) onlyTournament public {
         unicornToken.plusTourFreezingTime(_unicornId);
-
         if (unicornToken.getUnicornGenByte(_unicornId, 168) == 7) {
-            uint64  _time = 18446744073709551615 - 167 hours;
-            unicornToken.minusTourFreezingTime(_unicornId,_time);
+            uint64 _time = unicornToken.unicorns[_unicornId].freezingTourEndTime - now - freezing[7];
+            unicornToken.minusTourFreezingTime(_unicornId, _time);
         }
     }
 
@@ -2417,10 +2418,10 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
     //TODO ??
-//    function setGen0Step(uint _step) external onlyCommunity {
-//        gen0Step = _step;
-//        emit NewGen0Step(gen0Limit);
-//    }
+    //    function setGen0Step(uint _step) external onlyCommunity {
+    //        gen0Step = _step;
+    //        emit NewGen0Step(gen0Limit);
+    //    }
 
 
 
@@ -2457,6 +2458,11 @@ contract UnicornBreeding is UnicornAccessControl {
         market[marketSize++] = _unicornId;
 
         emit OfferAdd(_unicornId, _priceEth, _priceCandy);
+        //налетай)
+        if (_priceEth == 0 && _priceCandy) {
+            emit FreeOffer(_unicornId);
+        }
+
     }
 
 
@@ -2471,8 +2477,8 @@ contract UnicornBreeding is UnicornAccessControl {
 
         address owner = unicornToken.ownerOf(_unicornId);
 
-        //TODO ?? или просто индекс передавать 0 - эфир. 1 - кенди?
-        emit UnicornSold(_unicornId, price,'ETH');
+        //TODO ?? просто передавать две цены
+        emit UnicornSold(_unicornId, price, Currency.Eth);
         //deleteoffer вызовется внутри transfer
         unicornToken.marketTransfer(owner, msg.sender, _unicornId);
         owner.transfer(price);
@@ -2493,8 +2499,8 @@ contract UnicornBreeding is UnicornAccessControl {
             require(candyToken.transferFrom(msg.sender, this, getOfferPriceCandy(_unicornId)));
             candyToken.transfer(owner, price);
         }
-
-        emit UnicornSold(_unicornId, price,'Candy');
+        //TODO ?? просто передавать две цены
+        emit UnicornSold(_unicornId, price, Currency.Candy);
         //deleteoffer вызовется внутри transfer
         unicornToken.marketTransfer(owner, msg.sender, _unicornId);
     }
