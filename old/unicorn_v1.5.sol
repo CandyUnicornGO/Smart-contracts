@@ -2187,7 +2187,7 @@ contract UnicornBreeding is UnicornAccessControl {
     struct UnicornFreez {
         uint index;
         uint hybridizationsCount;
-        uint exists;
+        bool exists;
     }
 
     mapping (uint => UnicornFreez) public unicornsFreez;
@@ -2345,7 +2345,7 @@ contract UnicornBreeding is UnicornAccessControl {
         }
     }
 
- 
+
 
     function _getFreezeTime(uint freezingIndex) internal view returns (uint time) {
         freezingIndex %= maxFreezingIndex;
