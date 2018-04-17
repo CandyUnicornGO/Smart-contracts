@@ -114,7 +114,7 @@ contract UnicornAccessControl {
 contract BlackBoxController is UnicornAccessControl  {
     UnicornTokenInterface public unicornToken;
     address public ownOracle;
-    UnicornFamilyTree public familyTree;
+//    UnicornFamilyTree public familyTree;
 
     event Gene0Request(uint indexed unicornId);
     event GeneHybritizationRequest(uint indexed unicornId, uint firstAncestorUnicornId, uint secondAncestorUnicornId);
@@ -123,9 +123,10 @@ contract BlackBoxController is UnicornAccessControl  {
 
 
 
-    function BlackBoxController(address _unicornManagementAddress, address _familyTreeAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        require(_familyTreeAddress != address(0));
-        familyTree = UnicornFamilyTree(_familyTreeAddress);
+//    function BlackBoxController(address _unicornManagementAddress, address _familyTreeAddress) UnicornAccessControl(_unicornManagementAddress) public {
+    function BlackBoxController(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
+//        require(_familyTreeAddress != address(0));
+//        familyTree = UnicornFamilyTree(_familyTreeAddress);
     }
 
     function init() onlyManagement whenPaused external {
@@ -141,20 +142,27 @@ contract BlackBoxController is UnicornAccessControl  {
         unicornToken.setGene(unicornId, bytes(gene));
     }
 
-    function oracleRequest() internal {
-        require(address(this).balance >= unicornManagement.oraclizeFee());
-        ownOracle.transfer(unicornManagement.oraclizeFee());
+    function oracleCallbackWithdraw(uint unicornId, string gene) external {
+        uint value = gasleft() * tx.gasprice;
+        require(msg.sender == ownOracle);
+        unicornToken.setGene(unicornId, bytes(gene));
+        ownOracle.transfer(value);
     }
 
+//    function oracleRequest() internal {
+//        require(address(this).balance >= unicornManagement.oraclizeFee());
+//        ownOracle.transfer(unicornManagement.oraclizeFee());
+//    }
+
     function geneCore(uint _childUnicornId, uint _parent1UnicornId, uint _parent2UnicornId) onlyBreeding public payable {
-        oracleRequest();
-        familyTree.setAncestors(_childUnicornId, _parent1UnicornId, _parent2UnicornId);
+//        oracleRequest();
+//        familyTree.setAncestors(_childUnicornId, _parent1UnicornId, _parent2UnicornId);
         emit GeneHybritizationRequest(_childUnicornId, _parent1UnicornId, _parent2UnicornId);
     }
 
     function createGen0(uint _unicornId) onlyBreeding public payable {
-        oracleRequest();
-        familyTree.setAncestors(_unicornId, 0, 0);
+//        oracleRequest();
+//        familyTree.setAncestors(_unicornId, 0, 0);
         emit Gene0Request(_unicornId);
     }
 
