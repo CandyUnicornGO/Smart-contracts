@@ -2239,6 +2239,7 @@ contract UnicornBreeding is UnicornAccessControl {
         require(_secondUnicornId != _firstUnicornId);
         require(unicornToken.isUnfreezed(_firstUnicornId) && unicornToken.isUnfreezed(_secondUnicornId));
         require(hybridizations[_firstUnicornId].exists);
+        require(unicornToken.unicorns[_firstUnicornId].gene.length > 0 && unicornToken.unicorns[_secondUnicornId].gene.length > 0);
         require(msg.value == unicornManagement.oraclizeFee());
         if (hybridizations[_firstUnicornId].price > 0) {
             require(candyToken.transferFrom(msg.sender, this, getHybridizationPrice(_firstUnicornId)));
@@ -2247,13 +2248,12 @@ contract UnicornBreeding is UnicornAccessControl {
         plusFreezingTime(_firstUnicornId);
         plusFreezingTime(_secondUnicornId);
         uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
-        //        BlackBoxInterface blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
         blackBox.geneCore.value(unicornManagement.oraclizeFee())(newUnicornId, _firstUnicornId, _secondUnicornId);
-        emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
         if (hybridizations[_firstUnicornId].price > 0) {
             candyToken.transfer(unicornToken.ownerOf(_firstUnicornId), hybridizations[_firstUnicornId].price);
         }
         emit HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId, hybridizations[_firstUnicornId].price);
+        emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
         _deleteHybridization(_firstUnicornId);
     }
 
@@ -2263,7 +2263,7 @@ contract UnicornBreeding is UnicornAccessControl {
         require(unicornToken.owns(msg.sender, _firstUnicornId) && unicornToken.owns(msg.sender, _secondUnicornId));
         require(_secondUnicornId != _firstUnicornId);
         require(unicornToken.isUnfreezed(_firstUnicornId) && unicornToken.isUnfreezed(_secondUnicornId));
-
+        require(unicornToken.unicorns[_firstUnicornId].gene.length > 0 && unicornToken.unicorns[_secondUnicornId].gene.length > 0);
         require(msg.value == unicornManagement.oraclizeFee());
         if (selfHybridizationPrice > 0) {
             require(candyToken.transferFrom(msg.sender, this, selfHybridizationPrice));
@@ -2273,10 +2273,8 @@ contract UnicornBreeding is UnicornAccessControl {
         plusFreezingTime(_secondUnicornId);
         uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
         blackBox.geneCore.value(unicornManagement.oraclizeFee())(newUnicornId, _firstUnicornId, _secondUnicornId);
-        emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
-
         emit SelfHybridization(_firstUnicornId, _secondUnicornId, newUnicornId);
-
+        emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
     }
 
 
@@ -2355,11 +2353,10 @@ contract UnicornBreeding is UnicornAccessControl {
         //если 7 индекс то можно ничего не считать =)
         if (freezIndex == 7) {
             uint64 _time = unicornToken.unicorns[_unicornId].freezingEndTime - now - freezing[7];
-            unicornToken.minusFreezingTime(_unicornId,_time);
+            unicornToken.minusFreezingTime(_unicornId, _time);
         } else {
-
             //если меньше 3 спарок увеличиваю просто спарки, если 3 тогда увеличиваю индекс
-            //TODO ?? вынести количество спарок вынести в переменную
+            //TODO ?? вынести количество спарок в переменную
             if (unicornsFreeze[_unicornId].hybridizationsCount < 3) {
                 unicornsFreeze[_unicornId].hybridizationsCount++;
             } else {
@@ -2369,13 +2366,10 @@ contract UnicornBreeding is UnicornAccessControl {
                     unicornsFreeze[_unicornId].mustCalculate = true;
                 }
             }
-
             //как и раньше рендомно для индекса получаем время
             uint64 _time = unicornToken.unicorns[_unicornId].freezingEndTime - now - uint64(_getFreezeTime(unicornsFreeze[_unicornId].index));
-            unicornToken.minusFreezingTime(_unicornId,_time);
-
+            unicornToken.minusFreezingTime(_unicornId, _time);
         }
-
 
         if (unicornsFreeze[_unicornId].mustCalculate) {
             _calculateMinusFreezePriceRate(_unicornId);
@@ -2388,26 +2382,27 @@ contract UnicornBreeding is UnicornAccessControl {
     function _calculateMinusFreezePriceRate(uint _unicornId) internal {
         unicornsFreeze[_unicornId].mustCalculate = false;
         //TODO ?? может записывать в структуру эту сумму? она ведь всегда не изменна
-        uint bytesSumm = _getBytesSumm(_unicornId);
+        uint statsSum = _getStatsSum(_unicornId);
         uint hoursCount = freezing[unicornsFreeze[_unicornId].index] / 1 hours;
-        uint rate = bytesSumm.add(hoursCount).mul(100);
+        uint rate = statsSum.add(hoursCount).mul(100);
         unicornsFreeze[_unicornId].priceRate = rate.div(hoursCount);
     }
 
-
-    function _getBytesSumm(uint _unicornId) internal returns (uint) {
+    function _getStatsSum(uint _unicornId) internal returns (uint) {
         return 10;
     }
 
-
-    function updateFreezePriceRate(uint _unicornId) onlyGeneLab external {
+    function enableFreezePriceRateRecalc(uint _unicornId) onlyGeneLab external {
         unicornsFreeze[_unicornId].mustCalculate = true;
     }
 
-    function getFreezePriceRate(uint _unicornId) external returns (uint) {
+    function getUnreezingPrice(uint _unicornId) public returns (uint) {
         return unicornManagement.subFreezingPrice().mul(unicornsFreeze[_unicornId].priceRate).div(100);
     }
 
+    function getTourUnfreezingPrice(uint _unicornId) public returns (uint) {
+        return unicornManagement.subTourFreezingPrice().mul(unicornsFreeze[_unicornId].priceRate).div(100);
+    }
 
     function _getFreezeTime(uint freezingIndex) internal view returns (uint time) {
         time = freezing[freezingIndex];
@@ -2428,14 +2423,14 @@ contract UnicornBreeding is UnicornAccessControl {
 
     //change freezing time for megacandy
     function minusFreezingTime(uint _unicornId, uint _count) public {
-        uint price =  unicornManagement.subFreezingPrice().mul(unicornsFreeze[_unicornId].priceRate).div(100);
+        uint price = getUnreezingPrice(_unicornId);
         require(megaCandyToken.burn(msg.sender, price.mul(_count)));
         unicornToken.minusFreezingTime(_unicornId,  unicornManagement.subFreezingTime() * uint64(_count));
     }
 
     //change tour freezing time for megacandy
     function minusTourFreezingTime(uint _unicornId, uint _count) public {
-        uint price =  unicornManagement.subTourFreezingPrice().mul(unicornsFreeze[_unicornId].priceRate).div(100);
+        uint price = getTourUnfreezingPrice(_unicornId);
         require(megaCandyToken.burn(msg.sender, price.mul(_count)));
         unicornToken.minusTourFreezingTime(_unicornId, unicornManagement.subTourFreezingTime() * uint64(_count));
     }
