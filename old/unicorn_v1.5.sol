@@ -1210,6 +1210,7 @@ contract UnicornBreeding is UnicornAccessControl {
             unicornsFreeze[_unicornId].exists = true;
             unicornsFreeze[_unicornId].mustCalculate = true;
             unicornsFreeze[_unicornId].index = unicornToken.getUnicornGenByte(_unicornId, 163);
+            //TODO перенести в контракт туров
             unicornsFreeze[_unicornId].indexTour = unicornToken.getUnicornGenByte(_unicornId, 168);
             //            unicornsFreeze[_unicornId].freezingEndTime = _time;
             unicornsFreeze[_unicornId].hybridizationsCount = 0;
@@ -1313,6 +1314,7 @@ contract UnicornBreeding is UnicornAccessControl {
         return unicornToken.isUnfreezed(_unicornId) && unicornsFreeze[_unicornId].freezingEndTime <= now;
     }
 
+    //TODO перенести в контракт туров
     function isTourUnfreezed(uint _unicornId) public view returns (bool) {
         return unicornToken.isTourUnfreezed(_unicornId) && unicornsFreeze[_unicornId].freezingTourEndTime <= now;
     }
@@ -1324,7 +1326,7 @@ contract UnicornBreeding is UnicornAccessControl {
     /*
        (сумма генов + количество часов заморозки)/количество часов заморозки = стоимость снятия 1го часа заморозки в MegaCandy
     */
-    function getUnreezingPrice(uint _unicornId) public view returns (uint) {
+    function getUnfreezingPrice(uint _unicornId) public view returns (uint) {
         return unicornManagement.subFreezingPrice()
         .mul(unicornsFreeze[_unicornId].statsSumHours.add(freezing[unicornsFreeze[_unicornId].index]))
         .div(freezing[unicornsFreeze[_unicornId].index]);
@@ -1339,7 +1341,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     //change freezing time for megacandy
     function minusFreezingTime(uint _unicornId, uint _count) public {
-        uint price = getUnreezingPrice(_unicornId);
+        uint price = getUnfreezingPrice(_unicornId);
         require(megaCandyToken.burn(msg.sender, price.mul(_count)));
         //не минусуем на уже размороженных конях
         require(unicornsFreeze[_unicornId].freezingEndTime > now);
