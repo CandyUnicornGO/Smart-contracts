@@ -1033,7 +1033,7 @@ contract BreedingDataBase is UnicornAccessControl {
 
     }
 
-    function init() onlyManagement whenPaused external {
+    function init() onlyManagement whenPaused view external {
         //unicornBreeding = UnicornBreedingInterface(unicornManagement.unicornBreedingAddress());
     }
 
