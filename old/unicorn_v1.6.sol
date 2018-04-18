@@ -978,7 +978,64 @@ contract UnicornToken is UnicornBase {
     }
 }
 
+contract BreedingDataBase is UnicornAccessControl {
+    //counter for gen0
+    uint public gen0Limit = 30000;
+    uint public gen0Count = 839;
+    uint public gen0Step = 1000;
 
+    //counter for presale gen0
+    uint public gen0PresaleLimit = 1000;
+    uint public gen0PresaleCount = 0;
+
+    struct Hybridization{
+        uint listIndex;
+        uint price;
+        bool exists;
+    }
+
+    // Mapping from unicorn ID to Hybridization struct
+    mapping (uint => Hybridization) public hybridizations;
+    mapping(uint => uint) public hybridizationList;
+    uint public hybridizationListSize = 0;
+
+    function BreedingDataBase(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
+
+    }
+
+    function init() onlyManagement whenPaused external {
+        unicornBreeding = UnicornBreedingInterface(unicornManagement.unicornBreedingAddress());
+    }
+
+
+    function createHybridization(uint _unicornId, uint _price) onlyBreeding external {
+        hybridizations[_unicornId] = Hybridization({
+            price: _price,
+            exists: true,
+            listIndex: hybridizationListSize
+            });
+        hybridizationList[hybridizationListSize++] = _unicornId;
+    }
+
+
+    function hybridizationExists(uint _unicornId) external returns (bool) {
+        return hybridizations[_unicornId].exists;
+    }
+
+
+    function hybridizationPrice(uint _unicornId) external returns (uint) {
+        return hybridizations[_unicornId].price;
+    }
+
+
+    function deleteHybridization(uint _unicornId) onlyBreeding external {
+        hybridizations[hybridizationList[--hybridizationListSize]].listIndex = hybridizations[_unicornId].listIndex;
+        hybridizationList[hybridizations[_unicornId].listIndex] = hybridizationList[hybridizationListSize];
+        delete hybridizationList[hybridizationListSize];
+        delete hybridizations[_unicornId];
+    }
+
+}
 
 contract UnicornBreeding is UnicornAccessControl {
     using SafeMath for uint;
@@ -1011,30 +1068,13 @@ contract UnicornBreeding is UnicornAccessControl {
 
     ERC20 public candyToken;
     megaCandyInterface public megaCandyToken;
+    BreedingDataBaseInterface public breedingDB;
 
     uint public sellDividendPercentCandy = 375; //OnlyManager 4 digits. 10.5% = 1050
     uint public sellDividendPercentEth = 375; //OnlyManager 4 digits. 10.5% = 1050
     uint public selfHybridizationPrice = 0;
 
-    //counter for gen0
-    uint public gen0Limit = 30000;
-    uint public gen0Count = 839;
-    uint public gen0Step = 1000;
 
-    //counter for presale gen0
-    uint public gen0PresaleLimit = 1000;
-    uint public gen0PresaleCount = 0;
-
-    struct Hybridization{
-        uint listIndex;
-        uint price;
-        bool exists;
-    }
-
-    // Mapping from unicorn ID to Hybridization struct
-    mapping (uint => Hybridization) public hybridizations;
-    mapping(uint => uint) public hybridizationList;
-    uint public hybridizationListSize = 0;
 
 
     uint32[8] internal freezing = [
@@ -1059,7 +1099,7 @@ contract UnicornBreeding is UnicornAccessControl {
         uint hybridizationsCount;
         uint statsSumHours;
         uint freezingEndTime;
-        uint freezingTourEndTime;
+//        uint freezingTourEndTime;
         bool mustCalculate;
         bool exists;
     }
@@ -1071,9 +1111,9 @@ contract UnicornBreeding is UnicornAccessControl {
 
     }
 
-    function UnicornBreeding(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
+    function UnicornBreeding(address _breedingDB, address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
         candyToken = ERC20(unicornManagement.candyToken());
-
+        breedingDB = BreedingDataBaseInterface(_breedingDB);
     }
 
     function init() onlyManagement whenPaused external {
@@ -1085,14 +1125,9 @@ contract UnicornBreeding is UnicornAccessControl {
     function makeHybridization(uint _unicornId, uint _price) whenNotPaused public {
         require(unicornToken.owns(msg.sender, _unicornId));
         require(isUnfreezed(_unicornId));
-        require(!hybridizations[_unicornId].exists);
+        require(!breedingDB.hybridizationExists(_unicornId));
 
-        hybridizations[_unicornId] = Hybridization({
-            price: _price,
-            exists: true,
-            listIndex: hybridizationListSize
-            });
-        hybridizationList[hybridizationListSize++] = _unicornId;
+        breedingDB.createHybridization(_unicornId, _price);
 
         emit HybridizationAdd(_unicornId, _price);
         //свободная касса)
@@ -1106,11 +1141,14 @@ contract UnicornBreeding is UnicornAccessControl {
         require(unicornToken.owns(msg.sender, _secondUnicornId));
         require(_secondUnicornId != _firstUnicornId);
         require(isUnfreezed(_firstUnicornId) && isUnfreezed(_secondUnicornId));
-        require(hybridizations[_firstUnicornId].exists);
-        //TODO check empty gene
-        //        require(unicornToken.unicorns[_firstUnicornId].gene.length > 0 && unicornToken.unicorns[_secondUnicornId].gene.length > 0);
+        require(breedingDB.hybridizationExists(_firstUnicornId));
+
+        require(unicornToken.getUnicornGenByte(_firstUnicornId, 10) > 0 && unicornToken.getUnicornGenByte(_secondUnicornId, 10) > 0);
         require(msg.value == unicornManagement.oraclizeFee());
-        if (hybridizations[_firstUnicornId].price > 0) {
+
+        uint price = breedingDB.hybridizationPrice(_firstUnicornId);
+
+        if (price > 0) {
             require(candyToken.transferFrom(msg.sender, this, getHybridizationPrice(_firstUnicornId)));
         }
 
@@ -1118,10 +1156,10 @@ contract UnicornBreeding is UnicornAccessControl {
         plusFreezingTime(_secondUnicornId);
         uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
         blackBox.geneCore.value(unicornManagement.oraclizeFee())(newUnicornId, _firstUnicornId, _secondUnicornId);
-        if (hybridizations[_firstUnicornId].price > 0) {
-            candyToken.transfer(unicornToken.ownerOf(_firstUnicornId), hybridizations[_firstUnicornId].price);
+        if (price > 0) {
+            candyToken.transfer(unicornToken.ownerOf(_firstUnicornId), price);
         }
-        emit HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId, hybridizations[_firstUnicornId].price);
+        emit HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId, price);
         emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
         _deleteHybridization(_firstUnicornId);
     }
@@ -1132,8 +1170,8 @@ contract UnicornBreeding is UnicornAccessControl {
         require(unicornToken.owns(msg.sender, _firstUnicornId) && unicornToken.owns(msg.sender, _secondUnicornId));
         require(_secondUnicornId != _firstUnicornId);
         require(isUnfreezed(_firstUnicornId) && isUnfreezed(_secondUnicornId));
-        //TODO check empty gene
-        //        require(unicornToken.unicorns[_firstUnicornId].gene.length > 0 && unicornToken.unicorns[_secondUnicornId].gene.length > 0);
+        require(unicornToken.getUnicornGenByte(_firstUnicornId, 10) > 0 && unicornToken.getUnicornGenByte(_secondUnicornId, 10) > 0);
+
         require(msg.value == unicornManagement.oraclizeFee());
         if (selfHybridizationPrice > 0) {
             require(candyToken.transferFrom(msg.sender, this, selfHybridizationPrice));
@@ -1151,7 +1189,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     function cancelHybridization (uint _unicornId) whenNotPaused public {
         require(unicornToken.owns(msg.sender,_unicornId));
-        require(hybridizations[_unicornId].exists);
+        require(breedingDB.hybridizationExists(_unicornId));
         _deleteHybridization(_unicornId);
     }
 
@@ -1160,11 +1198,8 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
     function _deleteHybridization(uint _unicornId) internal {
-        if (hybridizations[_unicornId].exists) {
-            hybridizations[hybridizationList[--hybridizationListSize]].listIndex = hybridizations[_unicornId].listIndex;
-            hybridizationList[hybridizations[_unicornId].listIndex] = hybridizationList[hybridizationListSize];
-            delete hybridizationList[hybridizationListSize];
-            delete hybridizations[_unicornId];
+        if (breedingDB.hybridizationExists(_unicornId)) {
+            breedingDB.deleteHybridization(_unicornId);
             emit HybridizationDelete(_unicornId);
         }
     }
@@ -1402,16 +1437,6 @@ contract UnicornBreeding is UnicornAccessControl {
         gen0Limit = gen0Limit.add(gen0Step);
         emit NewGen0Limit(gen0Limit);
     }
-
-    //TODO ??
-    //    function setGen0Step(uint _step) external onlyCommunity {
-    //        gen0Step = _step;
-    //        emit NewGen0Step(gen0Limit);
-    //    }
-
-
-
-
 
     ////MARKET
     struct Offer{
