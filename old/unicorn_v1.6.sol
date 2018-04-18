@@ -561,15 +561,15 @@ contract UnicornTokenInterface {
     function allowance(address _claimant, uint256 _unicornId) public view returns (bool);
     function transferFrom(address _from, address _to, uint256 _unicornId) public;
 
-    //specific
-    struct Unicorn {
-        bytes gene;
-        uint64 birthTime;
-        uint64 freezingEndTime;
-        uint64 freezingTourEndTime;
-        string name;
-    }
-    mapping(uint256 => Unicorn) public unicorns;
+//    //specific
+//    struct Unicorn {
+//        bytes gene;
+//        uint64 birthTime;
+//        uint64 freezingEndTime;
+//        uint64 freezingTourEndTime;
+//        string name;
+//    }
+//    mapping(uint256 => Unicorn) public unicorns;
     //    function unicorns(uint _unicornId) external returns (bytes gene, uint64 birthTime, uint64 freezingEndTime, uint64 freezingTourEndTime, string name);
     function createUnicorn(address _owner) external returns (uint);
     //    function burnUnicorn(uint256 _unicornId) external;
@@ -999,12 +999,55 @@ contract BreedingDataBase is UnicornAccessControl {
     mapping(uint => uint) public hybridizationList;
     uint public hybridizationListSize = 0;
 
+    struct UnicornFreeze {
+        uint index;
+//        uint indexTour;
+        uint hybridizationsCount;
+        uint statsSumHours;
+        uint freezingEndTime;
+        //        uint freezingTourEndTime;
+        bool mustCalculate;
+        bool exists;
+    }
+
+    mapping (uint => UnicornFreeze) public unicornsFreeze;
+
+
+    struct Offer{
+        uint marketIndex;
+        uint priceEth;
+        uint priceCandy;
+        bool exists;
+    }
+
+    // Mapping from unicorn ID to Offer struct
+    mapping (uint => Offer) public offers;
+    // Mapping from unicorn ID to offer ID
+    //    mapping (uint => uint) public unicornOffer;
+    // market index => offerId
+    mapping(uint => uint) public market;
+    uint public marketSize = 0;
+
+
     function BreedingDataBase(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
 
     }
 
     function init() onlyManagement whenPaused external {
-        unicornBreeding = UnicornBreedingInterface(unicornManagement.unicornBreedingAddress());
+        //unicornBreeding = UnicornBreedingInterface(unicornManagement.unicornBreedingAddress());
+    }
+
+
+    function incGen0Count() onlyBreeding external {
+        gen0Count++;
+    }
+
+    function incGen0PresaleCount() onlyBreeding external {
+        gen0PresaleCount++;
+    }
+
+    function incGen0Limit() onlyBreeding external {
+        gen0Limit++;
     }
 
 
@@ -1018,12 +1061,12 @@ contract BreedingDataBase is UnicornAccessControl {
     }
 
 
-    function hybridizationExists(uint _unicornId) external returns (bool) {
+    function hybridizationExists(uint _unicornId) external view returns (bool) {
         return hybridizations[_unicornId].exists;
     }
 
 
-    function hybridizationPrice(uint _unicornId) external returns (uint) {
+    function hybridizationPrice(uint _unicornId) external view returns (uint) {
         return hybridizations[_unicornId].price;
     }
 
@@ -1035,7 +1078,153 @@ contract BreedingDataBase is UnicornAccessControl {
         delete hybridizations[_unicornId];
     }
 
+
+    function freezeIndex(uint _unicornId) external view returns (uint) {
+        return unicornsFreeze[_unicornId].index;
+    }
+
+    function freezeHybridizationsCount(uint _unicornId) external view returns (uint) {
+        return unicornsFreeze[_unicornId].hybridizationsCount;
+    }
+
+    function freezeStatsSumHours(uint _unicornId) external view returns (uint) {
+        return unicornsFreeze[_unicornId].statsSumHours;
+    }
+
+    function freezeEndTime(uint _unicornId) external view returns (uint) {
+        return unicornsFreeze[_unicornId].freezingEndTime;
+    }
+
+    function freezeMustCalculate(uint _unicornId) external view returns (bool) {
+        return unicornsFreeze[_unicornId].mustCalculate;
+    }
+
+    function freezeExists(uint _unicornId) external view returns (bool) {
+        return unicornsFreeze[_unicornId].exists;
+    }
+
+
+    function createFreeze(uint _unicornId, uint _index) onlyBreeding external {
+        unicornsFreeze[_unicornId].exists = true;
+        unicornsFreeze[_unicornId].mustCalculate = true;
+        unicornsFreeze[_unicornId].index = _index;
+        unicornsFreeze[_unicornId].hybridizationsCount = 0;
+    }
+
+    function incFreezeHybridizationsCount(uint _unicornId) onlyBreeding external {
+        unicornsFreeze[_unicornId].hybridizationsCount++;
+    }
+
+    function setFreezeHybridizationsCount(uint _unicornId, uint _count) onlyBreeding external {
+        unicornsFreeze[_unicornId].hybridizationsCount = _count;
+    }
+
+    function incFreezeIndex(uint _unicornId) onlyBreeding external {
+        unicornsFreeze[_unicornId].index++;
+    }
+
+    function setFreezeEndTime(uint _unicornId, uint _time) onlyBreeding external {
+        unicornsFreeze[_unicornId].freezingEndTime = _time;
+
+    }
+
+    function minusFreezeEndTime(uint _unicornId, uint _time) onlyBreeding external {
+        unicornsFreeze[_unicornId].freezingEndTime -= _time;
+    }
+
+
+
+    function setFreezeMustCalculate(uint _unicornId, bool _mustCalculate) onlyBreeding external {
+        unicornsFreeze[_unicornId].mustCalculate = _mustCalculate;
+    }
+
+    function setStatsSumHours(uint _unicornId, uint _statsSumHours) onlyBreeding external {
+        unicornsFreeze[_unicornId].statsSumHours = _statsSumHours;
+    }
+
+
+
+    function offerExists(uint _unicornId) external view returns (bool) {
+        return offers[_unicornId].exists;
+    }
+
+    function offerPriceEth(uint _unicornId) external view returns (uint) {
+        return offers[_unicornId].priceEth;
+    }
+
+    function offerPriceCandy(uint _unicornId) external view returns (uint) {
+        return offers[_unicornId].priceCandy;
+    }
+
+    function createOffer(uint _unicornId, uint _priceEth, uint _priceCandy) onlyBreeding external {
+        offers[_unicornId] = Offer({
+            priceEth: _priceEth,
+            priceCandy: _priceCandy,
+            exists: true,
+            marketIndex: marketSize
+            });
+
+        market[marketSize++] = _unicornId;
+    }
+
+    function deleteOffer(uint _unicornId) onlyBreeding external {
+        offers[market[--marketSize]].marketIndex = offers[_unicornId].marketIndex;
+        market[offers[_unicornId].marketIndex] = market[marketSize];
+        delete market[marketSize];
+        delete offers[_unicornId];
+    }
+
+
 }
+
+
+interface BreedingDataBaseInterface {
+
+    function gen0Limit() external view returns (uint);
+    function gen0Count() external view returns (uint);
+    function gen0Step() external view returns (uint);
+
+    function gen0PresaleLimit() external view returns (uint);
+    function gen0PresaleCount() external view returns (uint);
+
+    function incGen0Count() external;
+    function incGen0PresaleCount() external;
+    function incGen0Limit() external;
+
+
+    function createHybridization(uint _unicornId, uint _price) external;
+    function hybridizationExists(uint _unicornId) external view returns (bool);
+    function hybridizationPrice(uint _unicornId) external view returns (uint);
+    function deleteHybridization(uint _unicornId) external;
+
+    function freezeIndex(uint _unicornId) external view returns (uint);
+    function freezeHybridizationsCount(uint _unicornId) external view returns (uint);
+    function freezeStatsSumHours(uint _unicornId) external view returns (uint);
+    function freezeEndTime(uint _unicornId) external view returns (uint);
+    function freezeMustCalculate(uint _unicornId) external view returns (bool);
+    function freezeExists(uint _unicornId) external view returns (bool);
+
+    function createFreeze(uint _unicornId, uint _index) external;
+    function incFreezeHybridizationsCount(uint _unicornId) external;
+    function setFreezeHybridizationsCount(uint _unicornId, uint _count) external;
+
+    function incFreezeIndex(uint _unicornId) external;
+    function setFreezeEndTime(uint _unicornId, uint _time) external;
+    function minusFreezeEndTime(uint _unicornId, uint _time) external;
+    function setFreezeMustCalculate(uint _unicornId, bool _mustCalculate) external;
+    function setStatsSumHours(uint _unicornId, uint _statsSumHours) external;
+
+
+    function offerExists(uint _unicornId) external view returns (bool);
+    function offerPriceEth(uint _unicornId) external view returns (uint);
+    function offerPriceCandy(uint _unicornId) external view returns (uint);
+
+    function createOffer(uint _unicornId, uint _priceEth, uint _priceCandy) external;
+    function deleteOffer(uint _unicornId) external;
+
+}
+
+
 
 contract UnicornBreeding is UnicornAccessControl {
     using SafeMath for uint;
@@ -1075,8 +1264,6 @@ contract UnicornBreeding is UnicornAccessControl {
     uint public selfHybridizationPrice = 0;
 
 
-
-
     uint32[8] internal freezing = [
     uint32(1 hours),    //1 hour
     uint32(2 hours),    //2 - 4 hours
@@ -1093,18 +1280,6 @@ contract UnicornBreeding is UnicornAccessControl {
     0, 3, 5, 9, 13, 25, 25, 0
     ];
 
-    struct UnicornFreeze {
-        uint index;
-        uint indexTour;
-        uint hybridizationsCount;
-        uint statsSumHours;
-        uint freezingEndTime;
-//        uint freezingTourEndTime;
-        bool mustCalculate;
-        bool exists;
-    }
-
-    mapping (uint => UnicornFreeze) public unicornsFreeze;
 
 
     function() public payable {
@@ -1218,56 +1393,51 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
     function createPresaleUnicorns(uint _count, address _owner) public payable onlyManager whenPaused returns(bool) {
-        require(gen0PresaleCount.add(_count) <= gen0PresaleLimit);
+        require(breedingDB.gen0PresaleCount().add(_count) <= breedingDB.gen0PresaleLimit());
         uint256 newUnicornId;
         address owner = _owner == address(0) ? msg.sender : _owner;
         for (uint i = 0; i < _count; i++){
             newUnicornId = unicornToken.createUnicorn(owner);
             blackBox.createGen0(newUnicornId);
             emit CreateUnicorn(owner, newUnicornId, 0, 0);
-            gen0Count = gen0Count.add(1);
-            gen0PresaleCount = gen0PresaleCount.add(1);
+            breedingDB.incGen0Count();
+            breedingDB.incGen0PresaleCount();
         }
         return true;
     }
 
     function _createUnicorn(address _owner) private returns(uint256) {
-        require(gen0Count < gen0Limit);
+        require(breedingDB.gen0Count() < breedingDB.gen0Limit());
         uint256 newUnicornId = unicornToken.createUnicorn(_owner);
         blackBox.createGen0.value(unicornManagement.oraclizeFee())(newUnicornId);
         emit CreateUnicorn(_owner, newUnicornId, 0, 0);
-        gen0Count = gen0Count.add(1);
+        breedingDB.incGen0Count();
         return newUnicornId;
     }
 
 
     function plusFreezingTime(uint _unicornId) private {
-        if (!unicornsFreeze[_unicornId].exists) {
-            unicornsFreeze[_unicornId].exists = true;
-            unicornsFreeze[_unicornId].mustCalculate = true;
-            unicornsFreeze[_unicornId].index = unicornToken.getUnicornGenByte(_unicornId, 163);
-            //TODO перенести в контракт туров
-            unicornsFreeze[_unicornId].indexTour = unicornToken.getUnicornGenByte(_unicornId, 168);
-            //            unicornsFreeze[_unicornId].freezingEndTime = _time;
-            unicornsFreeze[_unicornId].hybridizationsCount = 0;
+        if (!breedingDB.freezeExists(_unicornId)) {
+            breedingDB.createFreeze(_unicornId, unicornToken.getUnicornGenByte(_unicornId, 163));
         } else {
             //если меньше 3 спарок увеличиваю просто спарки, если 3 тогда увеличиваю индекс
-            //TODO ?? вынести количество спарок в переменную
-            if (unicornsFreeze[_unicornId].hybridizationsCount < 3) {
-                unicornsFreeze[_unicornId].hybridizationsCount++;
+            if (breedingDB.freezeHybridizationsCount(_unicornId) < 3) {
+                    breedingDB.incFreezeHybridizationsCount(_unicornId);
             } else {
-                if (unicornsFreeze[_unicornId].index < freezing.length - 1) {
-                    unicornsFreeze[_unicornId].index++;
-                    unicornsFreeze[_unicornId].hybridizationsCount = 0;
+                if (breedingDB.freezeIndex(_unicornId) < freezing.length - 1) {
+                    breedingDB.incFreezeIndex(_unicornId);
+                    breedingDB.setFreezeHybridizationsCount(_unicornId,0);
                 }
             }
         }
-        uint _time = _getFreezeTime(unicornsFreeze[_unicornId].index) + now;
-        unicornsFreeze[_unicornId].freezingEndTime = _time;
+
+        uint _time = _getFreezeTime(breedingDB.freezeIndex(_unicornId)) + now;
+        breedingDB.setFreezeEndTime(_unicornId,_time);
         emit UnicornFreezingTimeSet(_unicornId, _time);
-        if (unicornsFreeze[_unicornId].mustCalculate) {
-            unicornsFreeze[_unicornId].mustCalculate = false;
-            unicornsFreeze[_unicornId].statsSumHours = _getStatsSumHours(_unicornId);
+
+        if (breedingDB.freezeMustCalculate(_unicornId)) {
+            breedingDB.setFreezeMustCalculate(_unicornId, false);
+            breedingDB.setStatsSumHours(_unicornId, _getStatsSumHours(_unicornId));
         }
     }
 
@@ -1337,25 +1507,26 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
     function isUnfreezed(uint _unicornId) public view returns (bool) {
-        return unicornToken.isUnfreezed(_unicornId) && unicornsFreeze[_unicornId].freezingEndTime <= now;
+        return unicornToken.isUnfreezed(_unicornId) && breedingDB.freezeEndTime(_unicornId) <= now;
     }
 
     //TODO перенести в контракт туров
-    function isTourUnfreezed(uint _unicornId) public view returns (bool) {
-        return unicornToken.isTourUnfreezed(_unicornId) && unicornsFreeze[_unicornId].freezingTourEndTime <= now;
-    }
+//    function isTourUnfreezed(uint _unicornId) public view returns (bool) {
+//        return unicornToken.isTourUnfreezed(_unicornId) && unicornsFreeze[_unicornId].freezingTourEndTime <= now;
+//    }
 
     function enableFreezePriceRateRecalc(uint _unicornId) onlyGeneLab external {
-        unicornsFreeze[_unicornId].mustCalculate = true;
+        breedingDB.setFreezeMustCalculate(_unicornId, true);
     }
 
     /*
        (сумма генов + количество часов заморозки)/количество часов заморозки = стоимость снятия 1го часа заморозки в MegaCandy
     */
     function getUnfreezingPrice(uint _unicornId) public view returns (uint) {
+        uint32 freezeHours = freezing[breedingDB.freezeIndex(_unicornId)];
         return unicornManagement.subFreezingPrice()
-        .mul(unicornsFreeze[_unicornId].statsSumHours.add(freezing[unicornsFreeze[_unicornId].index]))
-        .div(freezing[unicornsFreeze[_unicornId].index]);
+        .mul(breedingDB.freezeStatsSumHours(_unicornId).add(freezeHours))
+        .div(freezeHours);
     }
 
     function _getFreezeTime(uint freezingIndex) internal view returns (uint time) {
@@ -1370,38 +1541,38 @@ contract UnicornBreeding is UnicornAccessControl {
         uint price = getUnfreezingPrice(_unicornId);
         require(megaCandyToken.burn(msg.sender, price.mul(_count)));
         //не минусуем на уже размороженных конях
-        require(unicornsFreeze[_unicornId].freezingEndTime > now);
+        require(breedingDB.freezeEndTime(_unicornId) > now);
         //не используем safeMath, т.к. subFreezingTime в теории не должен быть больше now %)
-        unicornsFreeze[_unicornId].freezingEndTime -= uint(unicornManagement.subFreezingTime()).mul(_count);
+        breedingDB.minusFreezeEndTime(_unicornId, uint(unicornManagement.subFreezingTime()).mul(_count));
     }
 
-    //TODO перенести в контракт туров
-    function plusTourFreezingTime(uint _unicornId) onlyTournament public {
-        if (!unicornsFreeze[_unicornId].exists) {
-            unicornsFreeze[_unicornId].exists = true;
-            unicornsFreeze[_unicornId].mustCalculate = true;
-            unicornsFreeze[_unicornId].index = unicornToken.getUnicornGenByte(_unicornId, 163);
-            unicornsFreeze[_unicornId].indexTour = unicornToken.getUnicornGenByte(_unicornId, 168);
-        }
-        uint _time = _getFreezeTime(unicornsFreeze[_unicornId].indexTour) + now;
-        unicornsFreeze[_unicornId].freezingTourEndTime = _time;
-        emit UnicornTourFreezingTimeSet(_unicornId, _time);
-    }
+//    //TODO перенести в контракт туров
+//    function plusTourFreezingTime(uint _unicornId) onlyTournament public {
+//        if (!unicornsFreeze[_unicornId].exists) {
+//            unicornsFreeze[_unicornId].exists = true;
+//            unicornsFreeze[_unicornId].mustCalculate = true;
+//            unicornsFreeze[_unicornId].index = unicornToken.getUnicornGenByte(_unicornId, 163);
+//            unicornsFreeze[_unicornId].indexTour = unicornToken.getUnicornGenByte(_unicornId, 168);
+//        }
+//        uint _time = _getFreezeTime(unicornsFreeze[_unicornId].indexTour) + now;
+//        unicornsFreeze[_unicornId].freezingTourEndTime = _time;
+//        emit UnicornTourFreezingTimeSet(_unicornId, _time);
+//    }
 
     //change tour freezing time for megacandy
     //TODO перенести в контракт туров
-    function minusTourFreezingTime(uint _unicornId, uint _count) public {
-        uint price = unicornManagement.subTourFreezingPrice();  //getTourUnfreezingPrice(_unicornId);
-        require(megaCandyToken.burn(msg.sender, price.mul(_count)));
-        //не минусуем на уже размороженных конях
-        require(unicornsFreeze[_unicornId].freezingTourEndTime > now);
-        //не используем safeMath, т.к. subTourFreezingTime в теории не должен быть больше now %)
-        unicornsFreeze[_unicornId].freezingTourEndTime -= uint(unicornManagement.subTourFreezingTime()).mul(_count);
-    }
+//    function minusTourFreezingTime(uint _unicornId, uint _count) public {
+//        uint price = unicornManagement.subTourFreezingPrice();  //getTourUnfreezingPrice(_unicornId);
+//        require(megaCandyToken.burn(msg.sender, price.mul(_count)));
+//        //не минусуем на уже размороженных конях
+//        require(unicornsFreeze[_unicornId].freezingTourEndTime > now);
+//        //не используем safeMath, т.к. subTourFreezingTime в теории не должен быть больше now %)
+//        unicornsFreeze[_unicornId].freezingTourEndTime -= uint(unicornManagement.subTourFreezingTime()).mul(_count);
+//    }
 
 
     function getHybridizationPrice(uint _unicornId) public view returns (uint) {
-        return unicornManagement.getHybridizationFullPrice(hybridizations[_unicornId].price);
+        return unicornManagement.getHybridizationFullPrice(breedingDB.hybridizationPrice(_unicornId));
     }
 
     function getEtherFeeForPriceInCandy() public view returns (uint) {
@@ -1433,40 +1604,20 @@ contract UnicornBreeding is UnicornAccessControl {
 
 
     function setGen0Limit() external onlyCommunity {
-        require(gen0Count == gen0Limit);
-        gen0Limit = gen0Limit.add(gen0Step);
-        emit NewGen0Limit(gen0Limit);
+        require(breedingDB.gen0Count() == breedingDB.gen0Limit());
+        breedingDB.incGen0Limit();
+        emit NewGen0Limit(breedingDB.gen0Limit());
     }
 
     ////MARKET
-    struct Offer{
-        uint marketIndex;
-        uint priceEth;
-        uint priceCandy;
-        bool exists;
-    }
 
-    // Mapping from unicorn ID to Offer struct
-    mapping (uint => Offer) public offers;
-    // Mapping from unicorn ID to offer ID
-    //    mapping (uint => uint) public unicornOffer;
-    // market index => offerId
-    mapping(uint => uint) public market;
-    uint public marketSize = 0;
 
 
     function sellUnicorn(uint _unicornId, uint _priceEth, uint _priceCandy) whenNotPaused public {
         require(unicornToken.owns(msg.sender, _unicornId));
-        require(!offers[_unicornId].exists);
+        require(!breedingDB.offerExists(_unicornId));
 
-        offers[_unicornId] = Offer({
-            priceEth: _priceEth,
-            priceCandy: _priceCandy,
-            exists: true,
-            marketIndex: marketSize
-            });
-
-        market[marketSize++] = _unicornId;
+        breedingDB.createOffer(_unicornId, _priceEth, _priceCandy);
 
         emit OfferAdd(_unicornId, _priceEth, _priceCandy);
         //налетай)
@@ -1478,11 +1629,11 @@ contract UnicornBreeding is UnicornAccessControl {
 
 
     function buyUnicornWithEth(uint _unicornId) whenNotPaused public payable {
-        require(offers[_unicornId].exists);
-        uint price = offers[_unicornId].priceEth;
+        require(breedingDB.offerExists(_unicornId));
+        uint price = breedingDB.offerPriceEth(_unicornId);
         //Выставлять на продажу за 0 можно. Но нужно проверить чтобы и вторая цена также была 0
         if (price == 0) {
-            require(offers[_unicornId].priceCandy == 0);
+            require(breedingDB.offerPriceCandy(_unicornId) == 0);
         }
         require(msg.value == getOfferPriceEth(_unicornId));
 
@@ -1496,11 +1647,11 @@ contract UnicornBreeding is UnicornAccessControl {
 
 
     function buyUnicornWithCandy(uint _unicornId) whenNotPaused public {
-        require(offers[_unicornId].exists);
-        uint price = offers[_unicornId].priceCandy;
+        require(breedingDB.offerExists(_unicornId));
+        uint price = breedingDB.offerPriceCandy(_unicornId);
         //Выставлять на продажу за 0 можно. Но нужно проверить чтобы и вторая цена также была 0
         if (price == 0) {
-            require(offers[_unicornId].priceEth == 0);
+            require(breedingDB.offerPriceEth(_unicornId) == 0);
         }
 
         address owner = unicornToken.ownerOf(_unicornId);
@@ -1518,7 +1669,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     function revokeUnicorn(uint _unicornId) whenNotPaused public {
         require(unicornToken.owns(msg.sender, _unicornId));
-        require(offers[_unicornId].exists);
+        require(breedingDB.offerExists(_unicornId));
         _deleteOffer(_unicornId);
     }
 
@@ -1529,23 +1680,22 @@ contract UnicornBreeding is UnicornAccessControl {
 
 
     function _deleteOffer(uint _unicornId) internal {
-        if (offers[_unicornId].exists) {
-            offers[market[--marketSize]].marketIndex = offers[_unicornId].marketIndex;
-            market[offers[_unicornId].marketIndex] = market[marketSize];
-            delete market[marketSize];
-            delete offers[_unicornId];
+        if (breedingDB.offerExists(_unicornId)) {
+            breedingDB.deleteOffer(_unicornId);
             emit OfferDelete(_unicornId);
         }
     }
 
 
     function getOfferPriceEth(uint _unicornId) public view returns (uint) {
-        return offers[_unicornId].priceEth.add(valueFromPercent(offers[_unicornId].priceEth, sellDividendPercentEth));
+        uint priceEth = breedingDB.offerPriceEth(_unicornId);
+        return priceEth.add(valueFromPercent(priceEth, sellDividendPercentEth));
     }
 
 
     function getOfferPriceCandy(uint _unicornId) public view returns (uint) {
-        return offers[_unicornId].priceCandy.add(valueFromPercent(offers[_unicornId].priceCandy, sellDividendPercentCandy));
+        uint priceCandy = breedingDB.offerPriceCandy(_unicornId);
+        return priceCandy.add(valueFromPercent(priceCandy, sellDividendPercentCandy));
     }
 
 
