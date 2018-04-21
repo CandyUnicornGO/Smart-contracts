@@ -663,9 +663,6 @@ contract UnicornBase is UnicornAccessControl {
     */
     function ownerOf(uint256 _unicornId) public view returns (address) {
         return unicornOwner[_unicornId];
-        //        address owner = unicornOwner[_unicornId];
-        //        require(owner != address(0));
-        //        return owner;
     }
 
     function totalSupply() public view returns (uint256) {
@@ -779,7 +776,7 @@ contract UnicornBase is UnicornAccessControl {
     function addUnicorn(address _to, uint256 _unicornId) private {
         require(unicornOwner[_unicornId] == address(0));
         unicornOwner[_unicornId] = _to;
-        //        uint256 length = balanceOf(_to);
+
         uint256 length = ownedUnicorns[_to].length;
         ownedUnicorns[_to].push(_unicornId);
         ownedUnicornsIndex[_unicornId] = length;
@@ -811,24 +808,10 @@ contract UnicornBase is UnicornAccessControl {
         ownedUnicornsIndex[lastUnicorn] = unicornIndex;
         totalUnicorns = totalUnicorns.sub(1);
 
-        //deleting sale offer, if exists
-        //TODO check if contract exists?
-        //        if (address(unicornBreeding) != address(0)) {
+
         unicornBreeding.deleteOffer(_unicornId);
         unicornBreeding.deleteHybridization(_unicornId);
-        //        }
     }
-
-    //specific
-    //    function burnUnicorn(uint256 _unicornId) onlyOwnerOf(_unicornId) public  {
-    //        if (approvedFor(_unicornId) != 0) {
-    //            clearApproval(msg.sender, _unicornId);
-    //        }
-    //        removeUnicorn(msg.sender, _unicornId);
-    //        //destroy unicorn data
-    //        delete unicorns[_unicornId];
-    //        emit Transfer(msg.sender, 0x0, _unicornId);
-    //    }
 
 
     function createUnicorn(address _owner) onlyBreeding external returns (uint) {
@@ -1304,6 +1287,10 @@ contract UnicornBreeding is UnicornAccessControl {
 
         breedingDB.createHybridization(_unicornId, _price);
 
+        if (!breedingDB.freezeExists(_unicornId)) {
+            breedingDB.createFreeze(_unicornId, unicornToken.getUnicornGenByte(_unicornId, 163));
+        }
+
         emit HybridizationAdd(_unicornId, _price);
         //свободная касса)
         if (_price == 0) {
@@ -1348,6 +1335,7 @@ contract UnicornBreeding is UnicornAccessControl {
         require(unicornToken.getUnicornGenByte(_firstUnicornId, 10) > 0 && unicornToken.getUnicornGenByte(_secondUnicornId, 10) > 0);
 
         require(msg.value == unicornManagement.oraclizeFee());
+
         if (selfHybridizationPrice > 0) {
             require(candyToken.transferFrom(msg.sender, this, selfHybridizationPrice));
         }
@@ -1364,7 +1352,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     function cancelHybridization (uint _unicornId) whenNotPaused public {
         require(unicornToken.owns(msg.sender,_unicornId));
-        require(breedingDB.hybridizationExists(_unicornId));
+        //require(breedingDB.hybridizationExists(_unicornId));
         _deleteHybridization(_unicornId);
     }
 
@@ -1510,11 +1498,6 @@ contract UnicornBreeding is UnicornAccessControl {
         return unicornToken.isUnfreezed(_unicornId) && breedingDB.freezeEndTime(_unicornId) <= now;
     }
 
-    //TODO перенести в контракт туров
-//    function isTourUnfreezed(uint _unicornId) public view returns (bool) {
-//        return unicornToken.isTourUnfreezed(_unicornId) && unicornsFreeze[_unicornId].freezingTourEndTime <= now;
-//    }
-
     function enableFreezePriceRateRecalc(uint _unicornId) onlyGeneLab external {
         breedingDB.setFreezeMustCalculate(_unicornId, true);
     }
@@ -1545,31 +1528,6 @@ contract UnicornBreeding is UnicornAccessControl {
         //не используем safeMath, т.к. subFreezingTime в теории не должен быть больше now %)
         breedingDB.minusFreezeEndTime(_unicornId, uint(unicornManagement.subFreezingTime()).mul(_count));
     }
-
-//    //TODO перенести в контракт туров
-//    function plusTourFreezingTime(uint _unicornId) onlyTournament public {
-//        if (!unicornsFreeze[_unicornId].exists) {
-//            unicornsFreeze[_unicornId].exists = true;
-//            unicornsFreeze[_unicornId].mustCalculate = true;
-//            unicornsFreeze[_unicornId].index = unicornToken.getUnicornGenByte(_unicornId, 163);
-//            unicornsFreeze[_unicornId].indexTour = unicornToken.getUnicornGenByte(_unicornId, 168);
-//        }
-//        uint _time = _getFreezeTime(unicornsFreeze[_unicornId].indexTour) + now;
-//        unicornsFreeze[_unicornId].freezingTourEndTime = _time;
-//        emit UnicornTourFreezingTimeSet(_unicornId, _time);
-//    }
-
-    //change tour freezing time for megacandy
-    //TODO перенести в контракт туров
-//    function minusTourFreezingTime(uint _unicornId, uint _count) public {
-//        uint price = unicornManagement.subTourFreezingPrice();  //getTourUnfreezingPrice(_unicornId);
-//        require(megaCandyToken.burn(msg.sender, price.mul(_count)));
-//        //не минусуем на уже размороженных конях
-//        require(unicornsFreeze[_unicornId].freezingTourEndTime > now);
-//        //не используем safeMath, т.к. subTourFreezingTime в теории не должен быть больше now %)
-//        unicornsFreeze[_unicornId].freezingTourEndTime -= uint(unicornManagement.subTourFreezingTime()).mul(_count);
-//    }
-
 
     function getHybridizationPrice(uint _unicornId) public view returns (uint) {
         return unicornManagement.getHybridizationFullPrice(breedingDB.hybridizationPrice(_unicornId));
@@ -1669,7 +1627,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     function revokeUnicorn(uint _unicornId) whenNotPaused public {
         require(unicornToken.owns(msg.sender, _unicornId));
-        require(breedingDB.offerExists(_unicornId));
+        //require(breedingDB.offerExists(_unicornId));
         _deleteOffer(_unicornId);
     }
 
