@@ -1039,7 +1039,7 @@ contract BreedingDataBase is UnicornAccessControl {
 
     function incGen0Limit() onlyBreeding external {
         //TODO ?? добавил gen0Step, ок ?
-        gen0Limit += gen0Limit;
+        gen0Limit += gen0Step;
     }
 
 
