@@ -1214,7 +1214,9 @@ interface BreedingDataBaseInterface {
 }
 
 
-
+/*
+* НЕ ЗАБЫТЬ ДОБАВИТЬ АДРЕС БРИДИНГА В ЛЭНД МАНАДЖМЕНТ!!!
+*/
 contract UnicornBreeding is UnicornAccessControl {
     using SafeMath for uint;
     //onlyOwner
@@ -1288,6 +1290,7 @@ contract UnicornBreeding is UnicornAccessControl {
         require(unicornToken.owns(msg.sender, _unicornId));
         require(isUnfreezed(_unicornId));
         require(!breedingDB.hybridizationExists(_unicornId));
+        require(unicornToken.getUnicornGenByte(_unicornId, 10) > 0);
 
         checkFreeze(_unicornId);
         breedingDB.createHybridization(_unicornId, _price);
@@ -1397,15 +1400,14 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
     function plusFreezingTime(uint _unicornId) private {
-        if (checkFreeze(_unicornId)) { //if already exists
-            //если меньше 3 спарок увеличиваю просто спарки, если 3 тогда увеличиваю индекс
-            if (breedingDB.freezeHybridizationsCount(_unicornId) < 3) {
-                breedingDB.incFreezeHybridizationsCount(_unicornId);
-            } else {
-                if (breedingDB.freezeIndex(_unicornId) < freezing.length - 1) {
-                    breedingDB.incFreezeIndex(_unicornId);
-                    breedingDB.setFreezeHybridizationsCount(_unicornId,0);
-                }
+        checkFreeze(_unicornId);
+        //если меньше 3 спарок увеличиваю просто спарки, если 3 тогда увеличиваю индекс
+        if (breedingDB.freezeHybridizationsCount(_unicornId) < 3) {
+            breedingDB.incFreezeHybridizationsCount(_unicornId);
+        } else {
+            if (breedingDB.freezeIndex(_unicornId) < freezing.length - 1) {
+                breedingDB.incFreezeIndex(_unicornId);
+                breedingDB.setFreezeHybridizationsCount(_unicornId,0);
             }
         }
 
@@ -1414,11 +1416,9 @@ contract UnicornBreeding is UnicornAccessControl {
         emit UnicornFreezingTimeSet(_unicornId, _time);
     }
 
-    function checkFreeze(uint _unicornId) internal returns (bool exists){
-        exists = true;
+    function checkFreeze(uint _unicornId) internal {
         if (!breedingDB.freezeExists(_unicornId)) {
             breedingDB.createFreeze(_unicornId, unicornToken.getUnicornGenByte(_unicornId, 163));
-            exists = false;
         }
         if (breedingDB.freezeMustCalculate(_unicornId)) {
             breedingDB.setFreezeMustCalculate(_unicornId, false);
