@@ -972,7 +972,7 @@ contract BreedingDataBase is UnicornAccessControl {
     //counter for gen0
     uint public gen0Limit = 30000;
     uint public gen0Count = 839;
-    //TODO ?? нужен?
+
     uint public gen0Step = 1000;
 
     //counter for presale gen0
