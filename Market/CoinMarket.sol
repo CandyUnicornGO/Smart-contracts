@@ -134,14 +134,13 @@ contract CoinMarket is Ownable {
 
 
     /// Constructor function. This is only called on contract creation.
-    function CoinMarket(address admin_, uint feeTake_, address predecessor_) public {
-        admin = admin_;
+    function CoinMarket(uint feeTake_, address predecessor_) public {
         feeTake = feeTake_;
         depositingTokenFlag = false;
         predecessor = predecessor_;
 
         if (predecessor != address(0)) {
-            version = ForkDelta(predecessor).version() + 1;
+            version = CoinMarket(predecessor).version() + 1;
         } else {
             version = 1;
         }
@@ -186,7 +185,7 @@ contract CoinMarket is Ownable {
     */
     function deposit() external payable {
         tokens[0][msg.sender] = tokens[0][msg.sender].add(msg.value);
-        Deposit(0, msg.sender, msg.value, tokens[0][msg.sender]);
+        emit Deposit(0, msg.sender, msg.value, tokens[0][msg.sender]);
     }
 
     /**
@@ -199,7 +198,7 @@ contract CoinMarket is Ownable {
         require(tokens[0][msg.sender] >= amount);
         tokens[0][msg.sender] = tokens[0][msg.sender].sub(amount);
         msg.sender.transfer(amount);
-        Withdraw(0, msg.sender, amount, tokens[0][msg.sender]);
+        emit Withdraw(0, msg.sender, amount, tokens[0][msg.sender]);
     }
 
     /**
@@ -217,7 +216,7 @@ contract CoinMarket is Ownable {
         require(ERC20(token).transferFrom(msg.sender, this, amount));
         depositingTokenFlag = false;
         tokens[token][msg.sender] = tokens[token][msg.sender].add(amount);
-        Deposit(token, msg.sender, amount, tokens[token][msg.sender]);
+        emit Deposit(token, msg.sender, amount, tokens[token][msg.sender]);
     }
 
     /**
@@ -228,7 +227,7 @@ contract CoinMarket is Ownable {
     * @param amount amount of the incoming tokens
     * @param data attached data similar to msg.data of Ether transactions
     */
-    function tokenFallback( address sender, uint amount, bytes data) external returns (bool ok) {
+    function tokenFallback(address sender, uint amount, bytes data) external returns (bool ok) {
         if (depositingTokenFlag) {
             // Transfer was initiated from depositToken(). User token balance will be updated there.
             return true;
@@ -252,7 +251,7 @@ contract CoinMarket is Ownable {
         require(tokens[token][msg.sender] >= amount);
         tokens[token][msg.sender] = tokens[token][msg.sender].sub(amount);
         require(ERC20(token).transfer(msg.sender, amount));
-        Withdraw(token, msg.sender, amount, tokens[token][msg.sender]);
+        emit Withdraw(token, msg.sender, amount, tokens[token][msg.sender]);
     }
 
     /**
@@ -280,11 +279,11 @@ contract CoinMarket is Ownable {
     * @param expires uint of block number when this order should expire
     * @param nonce arbitrary random number
     */
-    function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce) external {
-        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
-        orders[msg.sender][hash] = true;
-        Order(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender);
-    }
+    //    function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce) external {
+    //        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
+    //        orders[msg.sender][hash] = true;
+    //        Order(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender);
+    //    }
 
     /**
     * Facilitates a trade from one user to another.
@@ -315,7 +314,7 @@ contract CoinMarket is Ownable {
             ));
         tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
         orderFills[user][hash] = orderFills[user][hash].add(amount);
-        Trade(tokenGet, amount, tokenGive, amountGive.mul(amount) / amountGet, user, msg.sender);
+        emit Trade(tokenGet, amount, tokenGive, amountGive.mul(amount) / amountGet, user, msg.sender);
     }
 
     /**
@@ -446,13 +445,13 @@ contract CoinMarket is Ownable {
     * @param s part of signature for the order hash as signed by user
     * @return uint: amount of the given order that has already been filled in terms of amountGet / tokenGet
     */
-    function cancelOrder(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, uint8 v, bytes32 r, bytes32 s) public {
-        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
-        require(orders[msg.sender][hash]);
-        //require ((orders[msg.sender][hash] || ecrecover(keccak256("\x19Ethereum Signed Message:\n32", hash), v, r, s) == msg.sender));
-        orderFills[msg.sender][hash] = amountGet;
-        Cancel(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender, v, r, s);
-    }
+    //    function cancelOrder(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, uint8 v, bytes32 r, bytes32 s) public {
+    //        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
+    //        require(orders[msg.sender][hash]);
+    //        //require ((orders[msg.sender][hash] || ecrecover(keccak256("\x19Ethereum Signed Message:\n32", hash), v, r, s) == msg.sender));
+    //        orderFills[msg.sender][hash] = amountGet;
+    //        Cancel(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender, v, r, s);
+    //    }
 
 
 
@@ -471,7 +470,7 @@ contract CoinMarket is Ownable {
 
         require(newContract != address(0));
 
-        ForkDelta newExchange = ForkDelta(newContract);
+        CoinMarket newExchange = CoinMarket(newContract);
 
         // Move Ether into new exchange.
         uint etherAmount = tokens[0][msg.sender];
@@ -493,7 +492,7 @@ contract CoinMarket is Ownable {
             }
         }
 
-        FundsMigrated(msg.sender, newContract);
+        emit FundsMigrated(msg.sender, newContract);
     }
 
     /**
