@@ -115,7 +115,6 @@ contract CoinMarket is Ownable {
     uint public feeTake; // percentage times (1 ether)
     bool private depositingTokenFlag; // True when Token.transferFrom is being called from depositToken
     mapping (address => mapping (address => uint)) public tokens; // mapping of token addresses to mapping of account balances (token=0 means Ether)
-    mapping (address => mapping (bytes32 => bool)) public orders; // mapping of user accounts to mapping of order hashes to booleans (true = submitted by user, equivalent to offchain signature)
     mapping (address => mapping (bytes32 => uint)) public orderFills; // mapping of user accounts to mapping of order hashes to uints (amount of order that has been filled)
     mapping (address => bool) public tokensWithoutFee;
     mapping (address => bool) public tokensListed;
@@ -125,8 +124,6 @@ contract CoinMarket is Ownable {
     uint16 public version; // This is the version # of the contract
 
     /// Logging Events
-    event Order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user);
-    event Cancel(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s);
     event Trade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give);
     event Deposit(address token, address user, uint amount, uint balance);
     event Withdraw(address token, address user, uint amount, uint balance);
@@ -269,23 +266,6 @@ contract CoinMarket is Ownable {
     ////////////////////////////////////////////////////////////////////////////////
 
     /**
-    * Stores the active order inside of the contract.
-    * Emits an Order event.
-    * Note: tokenGet & tokenGive can be the Ethereum contract address.
-    * @param tokenGet Ethereum contract address of the token to receive
-    * @param amountGet uint amount of tokens being received
-    * @param tokenGive Ethereum contract address of the token to give
-    * @param amountGive uint amount of tokens being given
-    * @param expires uint of block number when this order should expire
-    * @param nonce arbitrary random number
-    */
-    //    function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce) external {
-    //        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
-    //        orders[msg.sender][hash] = true;
-    //        Order(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender);
-    //    }
-
-    /**
     * Facilitates a trade from one user to another.
     * Requires that the transaction is signed properly, the trade isn't past its expiration, and all funds are present to fill the trade.
     * Calls tradeBalances().
@@ -307,11 +287,11 @@ contract CoinMarket is Ownable {
     */
     function trade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s, uint amount) external {
         bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
-        require((
-            (orders[user][hash] || ecrecover(keccak256("\x19Ethereum Signed Message:\n32", hash), v, r, s) == user) &&
+        require(
+            ecrecover(keccak256(keccak256("bytes32 Order hash"), keccak256(hash)), v, r, s) == user &&
             block.number <= expires &&
             orderFills[user][hash].add(amount) <= amountGet
-            ));
+            );
         tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
         orderFills[user][hash] = orderFills[user][hash].add(amount);
         emit Trade(tokenGet, amount, tokenGive, amountGive.mul(amount) / amountGet, user, msg.sender);
@@ -392,10 +372,7 @@ contract CoinMarket is Ownable {
     */
     function availableVolume(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s) public view returns(uint) {
         bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
-        if (!(
-        (orders[user][hash] || ecrecover(keccak256("\x19Ethereum Signed Message:\n32", hash), v, r, s) == user) &&
-        block.number <= expires
-        )) {
+        if (!(ecrecover(keccak256(keccak256("bytes32 Order hash"), keccak256(hash)), v, r, s) == user && block.number <= expires)) {
             return 0;
         }
         uint[2] memory available;
@@ -427,33 +404,6 @@ contract CoinMarket is Ownable {
         bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
         return orderFills[user][hash];
     }
-
-    /**
-    * This function cancels a given order by editing its fill data to the full amount.
-    * Requires that the transaction is signed properly.
-    * Updates orderFills to the full amountGet
-    * Emits a Cancel event.
-    * Note: tokenGet & tokenGive can be the Ethereum contract address.
-    * @param tokenGet Ethereum contract address of the token to receive
-    * @param amountGet uint amount of tokens being received
-    * @param tokenGive Ethereum contract address of the token to give
-    * @param amountGive uint amount of tokens being given
-    * @param expires uint of block number when this order should expire
-    * @param nonce arbitrary random number
-    * @param v part of signature for the order hash as signed by user
-    * @param r part of signature for the order hash as signed by user
-    * @param s part of signature for the order hash as signed by user
-    * @return uint: amount of the given order that has already been filled in terms of amountGet / tokenGet
-    */
-    //    function cancelOrder(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, uint8 v, bytes32 r, bytes32 s) public {
-    //        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
-    //        require(orders[msg.sender][hash]);
-    //        //require ((orders[msg.sender][hash] || ecrecover(keccak256("\x19Ethereum Signed Message:\n32", hash), v, r, s) == msg.sender));
-    //        orderFills[msg.sender][hash] = amountGet;
-    //        Cancel(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender, v, r, s);
-    //    }
-
-
 
 
     ////////////////////////////////////////////////////////////////////////////////
