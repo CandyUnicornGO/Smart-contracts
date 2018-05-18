@@ -112,7 +112,7 @@ contract CoinMarket is Ownable {
 
     using SafeMath for uint;
 
-    uint public feeTake; // percentage times (1 ether)
+    uint public fee; // percentage times (1 ether)
     bool private depositingTokenFlag; // True when Token.transferFrom is being called from depositToken
     mapping (address => mapping (address => uint)) public tokens; // mapping of token addresses to mapping of account balances (token=0 means Ether)
     mapping (address => mapping (bytes32 => uint)) public orderFills; // mapping of user accounts to mapping of order hashes to uints (amount of order that has been filled)
@@ -131,10 +131,10 @@ contract CoinMarket is Ownable {
 
 
     /// Constructor function. This is only called on contract creation.
-    function CoinMarket(uint feeTake_, address predecessor_) public {
-        feeTake = feeTake_;
+    function CoinMarket(uint _fee, address _predecessor) public {
+        fee = _fee;
         depositingTokenFlag = false;
-        predecessor = predecessor_;
+        predecessor = _predecessor;
 
         if (predecessor != address(0)) {
             version = CoinMarket(predecessor).version() + 1;
@@ -150,13 +150,13 @@ contract CoinMarket is Ownable {
 
 
     /// Changes the fee on takes.
-    function changeFeeTake(uint feeTake_) external onlyOwner {
-        feeTake = feeTake_;
+    function setFee(uint _fee) external onlyOwner {
+        fee = _fee;
     }
 
 
-    function setTokenWithoutFee(address _token, bool _takeFee) external onlyOwner {
-        tokensWithoutFee[_token] = _takeFee;
+    function setTokenWithoutFee(address _token, bool _noFee) external onlyOwner {
+        tokensWithoutFee[_token] = _noFee;
     }
 
 
@@ -166,9 +166,9 @@ contract CoinMarket is Ownable {
 
 
     /// Changes the successor. Used in updating the contract.
-    function setSuccessor(address successor_) external onlyOwner {
-        require(successor_ != address(0));
-        successor = successor_;
+    function setSuccessor(address _successor) external onlyOwner {
+        require(_successor != address(0));
+        successor = _successor;
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -313,15 +313,15 @@ contract CoinMarket is Ownable {
     */
     function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount) private {
 
-        uint feeTakeXfer = 0;
+        uint _fee = 0;
 
         if (!tokensWithoutFee[tokenGet]) {
-            feeTakeXfer = amount.mul(feeTake).div(1 ether);
+            _fee = amount.mul(fee).div(1 ether);
         }
 
-        tokens[tokenGet][msg.sender] = tokens[tokenGet][msg.sender].sub(amount.add(feeTakeXfer));
-        tokens[tokenGet][user] = tokens[tokenGet][user].add(amount);
-        tokens[tokenGet][wallet] = tokens[tokenGet][wallet].add(feeTakeXfer);
+        tokens[tokenGet][msg.sender] = tokens[tokenGet][msg.sender].sub(amount);
+        tokens[tokenGet][user] = tokens[tokenGet][user].add(amount.sub(_fee));
+        tokens[tokenGet][wallet] = tokens[tokenGet][wallet].add(_fee);
         tokens[tokenGive][user] = tokens[tokenGive][user].sub(amountGive.mul(amount).div(amountGet));
         tokens[tokenGive][msg.sender] = tokens[tokenGive][msg.sender].add(amountGive.mul(amount).div(amountGet));
     }
