@@ -1341,7 +1341,6 @@ contract UnicornBalances is UnicornAccessControl {
     //////////////////////////////////////////////////////////////////////////////////////////
 
     function transferTokensToDividendManager(address token) onlyManager public {
-
         require(token != address(0));
         require(!trustedTokens[token]);
         require(tokens[token][address(this)] > 0);
@@ -1476,8 +1475,8 @@ contract UnicornBalances is UnicornAccessControl {
 
 
 interface UnicornBalancesInterface {
-    //    function tokenPlus(address _token, address _user, uint _value) external;
-    //    function tokenMinus(address _token, address _user, uint _value) external;
+    //    function tokenPlus(address _token, address _user, uint _value) external returns (bool);
+    //    function tokenMinus(address _token, address _user, uint _value) external returns (bool);
     function trustedTokens(address _token) external view returns (bool);
     //    function balanceOf(address token, address user) external view returns (uint);
     function transfer(address _token, address _from, address _to, uint _value) external returns (bool);
@@ -1855,7 +1854,6 @@ contract UnicornMarket is UnicornBreeding {
 
         if (price > 0) {
             uint fullPrice = getOfferPriceCandy(_unicornId);
-            //            require(balances.balanceOf(candyTokenAddress,msg.sender) >= fullPrice);
             require(balances.transferWithFee(candyTokenAddress, msg.sender, fullPrice, balances, owner, price));
         }
 
@@ -1995,14 +1993,11 @@ contract UnicornCoinMarket is UnicornMarket {
         }
 
 
-        //TODO вывод TrustedToken которые на адресе контракта
         if (balances.trustedTokens(tokenGet)) {
             TrustedTokenInterface t = TrustedTokenInterface(tokenGet);
             require(t.transferFromSystem(msg.sender, user, amount));
             require(t.transferFromSystem(msg.sender, this, _fee));
         } else {
-            //        function transferWithFee(address _token, address _userFrom, uint _fullPrice, address _feeTaker, address _priceTaker, uint _price) onlyBreeding external returns (bool) {
-
             require(
                 balances.transferWithFee(tokenGet, msg.sender, amount, balances, user, amount.sub(_fee))
             );

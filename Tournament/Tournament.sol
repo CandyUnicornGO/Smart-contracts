@@ -196,8 +196,8 @@ contract TrustedTokenInterface is ERC20 {
 
 
 interface UnicornBalancesInterface {
-    function tokenPlus(address _token, address _user, uint _value) external;
-    function tokenMinus(address _token, address _user, uint _value) external;
+    function tokenPlus(address _token, address _user, uint _value) external returns (bool);
+    function tokenMinus(address _token, address _user, uint _value) external returns (bool);
     function trustedTokens(address _token) external view returns (bool);
     function balanceOf(address token, address user) external view returns (uint);
     function transfer(address _token, address _from, address _to, uint _value) external returns (bool);
