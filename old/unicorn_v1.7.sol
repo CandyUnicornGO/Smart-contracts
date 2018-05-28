@@ -1200,6 +1200,7 @@ interface BreedingDataBaseInterface {
 }
 
 
+
 contract UnicornBalances is UnicornAccessControl {
     using SafeMath for uint;
 
@@ -1340,6 +1341,7 @@ contract UnicornBalances is UnicornAccessControl {
     //////////////////////////////////////////////////////////////////////////////////////////
 
     function transferTokensToDividendManager(address token) onlyManager public {
+
         require(token != address(0));
         require(!trustedTokens[token]);
         require(tokens[token][address(this)] > 0);
@@ -1367,15 +1369,18 @@ contract UnicornBalances is UnicornAccessControl {
     }
 
 
+
     function tokenPlus(address _token, address _user, uint _value) onlyUnicornContract external returns (bool)  {
         tokens[_token][_user] = tokens[_token][_user].add(_value);
         return true;
     }
 
+
     function tokenMinus(address _token, address _user, uint _value) onlyUnicornContract external returns (bool) {
         tokens[_token][_user] = tokens[_token][_user].sub(_value);
         return true;
     }
+
 
 
     function transfer(address _token, address _from, address _to, uint _value) onlyUnicornContract external returns (bool) {
@@ -1384,6 +1389,7 @@ contract UnicornBalances is UnicornAccessControl {
         return true;
     }
 
+
     function transferWithFee(address _token, address _userFrom, uint _fullPrice, address _feeTaker, address _priceTaker, uint _price) onlyUnicornContract external returns (bool) {
         uint fee = _fullPrice.sub(_price);
         tokens[_token][_userFrom] = tokens[_token][_userFrom].sub(_fullPrice);
@@ -1391,6 +1397,7 @@ contract UnicornBalances is UnicornAccessControl {
         tokens[_token][_priceTaker] = tokens[_token][_priceTaker].add(_price);
         return true;
     }
+
 
     function setTrustedTokens(address _token, bool _trusted) external onlyOwner {
         trustedTokens[_token] = _trusted;
@@ -1431,6 +1438,7 @@ contract UnicornBalances is UnicornAccessControl {
         emit FundsMigrated(msg.sender, newContract);
     }
 
+
     /**
     * This function handles deposits of Ether into the contract, but allows specification of a user.
     * Note: This is generally used in migration of funds.
@@ -1441,6 +1449,8 @@ contract UnicornBalances is UnicornAccessControl {
         require(msg.value > 0);
         tokens[0][user] = tokens[0][user].add(msg.value);
     }
+
+
 
     /**
     * This function handles deposits of Ethereum based tokens into the contract, but allows specification of a user.
@@ -1461,7 +1471,6 @@ contract UnicornBalances is UnicornAccessControl {
         depositingTokenFlag = false;
         tokens[token][user] = tokens[token][user].add(amount);
     }
-
 
 }
 
@@ -1548,8 +1557,9 @@ contract UnicornBreeding is UnicornAccessControl {
 
         if (price > 0) {
             uint fullPrice = unicornManagement.getHybridizationFullPrice(price);
-            //            require(balances.balanceOf(candyTokenAddress,msg.sender) >= fullPrice);
+
             require(balances.transferWithFee(candyTokenAddress, msg.sender, fullPrice, balances, unicornToken.ownerOf(_firstUnicornId), price));
+
         }
 
         plusFreezingTime(_firstUnicornId);
@@ -1609,7 +1619,6 @@ contract UnicornBreeding is UnicornAccessControl {
         require(msg.value == unicornManagement.oraclizeFee());
         uint price = getCreateUnicornPriceInCandy();
         //        require(balances.balanceOf(candyTokenAddress,msg.sender) >= price);
-
         require(balances.transfer(candyTokenAddress, msg.sender, balances, price));
         return _createUnicorn(msg.sender);
     }
@@ -1847,7 +1856,6 @@ contract UnicornMarket is UnicornBreeding {
         if (price > 0) {
             uint fullPrice = getOfferPriceCandy(_unicornId);
             //            require(balances.balanceOf(candyTokenAddress,msg.sender) >= fullPrice);
-
             require(balances.transferWithFee(candyTokenAddress, msg.sender, fullPrice, balances, owner, price));
         }
 
@@ -1986,25 +1994,29 @@ contract UnicornCoinMarket is UnicornMarket {
             _fee = amount.mul(feeTake).div(1 ether);
         }
 
+
+        //TODO вывод TrustedToken которые на адресе контракта
         if (balances.trustedTokens(tokenGet)) {
             TrustedTokenInterface t = TrustedTokenInterface(tokenGet);
             require(t.transferFromSystem(msg.sender, user, amount));
             require(t.transferFromSystem(msg.sender, this, _fee));
         } else {
+            //        function transferWithFee(address _token, address _userFrom, uint _fullPrice, address _feeTaker, address _priceTaker, uint _price) onlyBreeding external returns (bool) {
+
             require(
                 balances.transferWithFee(tokenGet, msg.sender, amount, balances, user, amount.sub(_fee))
             );
+            //            balances.tokenMinus(tokenGet, msg.sender, amount);
+            //            balances.tokenPlus(tokenGet, user, amount.sub(_fee));
+            //            balances.tokenPlus(tokenGet, this, _fee);
         }
 
         if (balances.trustedTokens(tokenGive)) {
-            //require(TrustedTokenInterface(tokenGet).transferFromSystem(user, msg.sender, amountGive.mul(amount).div(amountGet)));
             require(TrustedTokenInterface(tokenGive).transferFromSystem(user, msg.sender, amountGive.mul(amount).div(amountGet)));
         } else {
             require(balances.transfer(tokenGive, user, msg.sender, amountGive.mul(amount).div(amountGet)));
         }
-
     }
-
 }
 
 
