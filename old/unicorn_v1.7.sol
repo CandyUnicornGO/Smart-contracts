@@ -1343,14 +1343,14 @@ contract UnicornBalances is UnicornAccessControl {
     function transferTokensToDividendManager(address token) onlyManager public {
         require(token != address(0));
         require(!trustedTokens[token]);
-        require(tokens[token][address(this)] > 0);
-        require(ERC20(token).transfer(unicornManagement.walletAddress(), tokens[token][address(this)]));
-        tokens[token][address(this)] = 0;
+        require(tokens[token][this] > 0);
+        require(ERC20(token).transfer(unicornManagement.walletAddress(), tokens[token][this]));
+        tokens[token][this] = 0;
         //emit Withdraw(token, msg.sender, amount, tokens[token][msg.sender]);
     }
 
     function transferEthersToDividendManager(uint _value) onlyManager public {
-        require(tokens[0][address(this)] >= _value);
+        require(tokens[0][this] >= _value);
         DividendManagerInterface dividendManager = DividendManagerInterface(unicornManagement.dividendManagerAddress());
         dividendManager.payDividend.value(_value)();
         tokens[0][msg.sender] = tokens[0][msg.sender].sub(_value);
