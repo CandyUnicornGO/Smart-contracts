@@ -1914,13 +1914,12 @@ contract UnicornMarket is UnicornBreeding {
 
 
 contract UnicornCoinMarket is UnicornMarket {
-    uint public feeTake = 30000000000000000; // percentage times (1 ether)
+    uint public feeTake = 5000000000000000; // 0.5% percentage times (1 ether)
     mapping (address => mapping (bytes32 => uint)) public orderFills; // mapping of user accounts to mapping of order hashes to uints (amount of order that has been filled)
     mapping (address => bool) public tokensWithoutFee;
 
-
     /// Logging Events
-    event Trade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give);
+    event Trade(bytes32 indexed hash, address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give);
 
 
     /// Changes the fee on takes.
@@ -1959,15 +1958,15 @@ contract UnicornCoinMarket is UnicornMarket {
     * @param amount uint amount in terms of tokenGet that will be "buy" in the trade
     */
     function trade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s, uint amount) external {
-        bytes32 hash = sha256(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
+        bytes32 hash = sha256(balances, tokenGet, amountGet, tokenGive, amountGive, expires, nonce);
         require(
             ecrecover(keccak256(keccak256("bytes32 Order hash"), keccak256(hash)), v, r, s) == user &&
             block.number <= expires &&
             orderFills[user][hash].add(amount) <= amountGet
         );
-        tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
+        uint amount2 =  tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
         orderFills[user][hash] = orderFills[user][hash].add(amount);
-        emit Trade(tokenGet, amount, tokenGive, amountGive.mul(amount) / amountGet, user, msg.sender);
+        emit Trade(hash, tokenGet, amount, tokenGive, amount2, user, msg.sender);
     }
 
     /**
@@ -1984,7 +1983,7 @@ contract UnicornCoinMarket is UnicornMarket {
     * @param user Ethereum address of the user who placed the order
     * @param amount uint amount in terms of tokenGet that will be "buy" in the trade
     */
-    function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount) private {
+    function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount) private returns(uint amount2){
 
         uint _fee = 0;
 
@@ -2006,10 +2005,11 @@ contract UnicornCoinMarket is UnicornMarket {
             //            balances.tokenPlus(tokenGet, this, _fee);
         }
 
+        amount2 = amountGive.mul(amount).div(amountGet);
         if (balances.trustedTokens(tokenGive)) {
-            require(TrustedTokenInterface(tokenGive).transferFromSystem(user, msg.sender, amountGive.mul(amount).div(amountGet)));
+            require(TrustedTokenInterface(tokenGive).transferFromSystem(user, msg.sender, amount2));
         } else {
-            require(balances.transfer(tokenGive, user, msg.sender, amountGive.mul(amount).div(amountGet)));
+            require(balances.transfer(tokenGive, user, msg.sender, amount2));
         }
     }
 }
