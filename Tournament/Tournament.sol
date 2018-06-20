@@ -209,23 +209,69 @@ contract UnicornTournament is UnicornAccessControl{
     using SafeMath for uint;
     //ERC20 public candyToken;
 
-    event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId);
 
-
-    struct tournament{
+    struct Tournament{
+        uint[] unicorns;
         uint blockNum;
-
+        uint index;
+        bool finished;
     }
 
-    //require(unicornToken.owns(msg.sender, _secondUnicornId));
+    mapping(uint => Tournament) public tournaments;
+    //unicornId => tournamentId
+    mapping (uint => uint) public unicornTournament;
+    // Tournament index => tournamentId
+    mapping(uint => uint) public tournamentsIndexes;
+    uint public tournamentsSize = 0;
 
+    uint tournamentId = 0;
+    uint public maxTournamentPlayers = 5;
 
     function() public payable {
 
     }
 
+
+
+
+    function createTournament(uint _unicornId) public {
+        require(unicornToken.owns(msg.sender, _unicornId));
+        require(unicornTournament[_unicornId] == 0);
+
+
+        tournaments[++tournamentId].unicorns.push(_unicornId);
+        tournaments[tournamentId].index = tournamentsSize;
+
+        tournamentsIndexes[tournamentsSize++] = tournamentId;
+
+    }
+
+    function joinTournament(uint _tournamentId, uint _unicornId) {
+        require(unicornToken.owns(msg.sender, _unicornId));
+        require(unicornTournament[_unicornId] == 0);
+        require(!tournaments[_tournamentId].finished);
+        //after create unicorns.length == 1 its means tournament exists
+        require(tournaments[_tournamentId].unicorns.length > 0 &&
+                tournaments[_tournamentId].unicorns.length < maxTournamentPlayers);
+
+
+        tournaments[++tournamentId].unicorns.push(_unicornId);
+
+        if (tournaments[_tournamentId].unicorns.length == maxTournamentPlayers) {
+            tournaments[_tournamentId].blockNum == block.number;
+        }
+
+    }
+
+    function getTournamentUnicorns(uint _tournamentId)  public view returns (uint[]) {
+        return tournaments[_tournamentId].unicorns;
+    }
+
+
+
+
     function UnicornTournament(address _balances, address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        candyTokenAddress = unicornManagement.candyToken();
+        //candyTokenAddress = unicornManagement.candyToken();
         balances = UnicornBalancesInterface(_balances);
     }
 
