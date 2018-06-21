@@ -1993,7 +1993,7 @@ contract UnicornGen0 is UnicornAccessControl {
     event NewGen0Step(uint step);
 
     function UnicornGen0(/*address _breedingDB, address _balances, address _prices, */ address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        candyTokenAddress = unicornManagement.candyToken();
+
         //candyToken = TrustedTokenInterface(unicornManagement.candyToken());
         //        breedingDB = BreedingDataBaseInterface(_breedingDB);
         //        balances = UnicornBalancesInterface(_balances);
@@ -2005,6 +2005,7 @@ contract UnicornGen0 is UnicornAccessControl {
     }
 
     function init() onlyManagement whenPaused external {
+        candyTokenAddress = unicornManagement.candyToken();
         unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
         blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
         breedingDB = BreedingDataBaseInterface(unicornManagement.unicornBreedingDBAddress());
@@ -2086,11 +2087,11 @@ contract UnicornBreeding is UnicornAccessControl {
     }
 
     function UnicornBreeding(address _unicornFreezing, address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        candyTokenAddress = unicornManagement.candyToken();
         unicornFreezing = UnicornFreezingInterface(_unicornFreezing);
     }
 
     function init() onlyManagement whenPaused external {
+        candyTokenAddress = unicornManagement.candyToken();
         unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
         blackBox = BlackBoxInterface(unicornManagement.blackBoxAddress());
         breedingDB = BreedingDataBaseInterface(unicornManagement.unicornBreedingDBAddress());
@@ -2202,7 +2203,7 @@ contract UnicornMarket is UnicornAccessControl {
 
 
     function UnicornMarket(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        candyTokenAddress = unicornManagement.candyToken();
+
     }
 
     function() public payable{
@@ -2210,6 +2211,7 @@ contract UnicornMarket is UnicornAccessControl {
     }
 
     function init() onlyManagement whenPaused external {
+        candyTokenAddress = unicornManagement.candyToken();
         unicornToken = UnicornTokenInterface(unicornManagement.unicornTokenAddress());
         breedingDB = BreedingDataBaseInterface(unicornManagement.unicornBreedingDBAddress());
         prices = UnicornPricesInterface(unicornManagement.unicornPricesAddress());
@@ -2586,7 +2588,7 @@ contract UserRank is UnicornAccessControl /*, CanReceiveApproval*/ {
 
 
     function UserRank(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        candyTokenAddress = unicornManagement.candyToken();
+
         //        allowedFuncs[bytes4(keccak256("_receiveBuyNextRank(address)"))] = true;
         //        allowedFuncs[bytes4(keccak256("_receiveBuyRank(address,uint256)"))] = true;
         //3350000000000000 for candy
@@ -2609,6 +2611,7 @@ contract UserRank is UnicornAccessControl /*, CanReceiveApproval*/ {
     }
 
     function init() onlyManagement whenPaused external {
+        candyTokenAddress = unicornManagement.candyToken();
         balances = UnicornBalancesInterface(unicornManagement.unicornBalancesAddress());
     }
 
@@ -2975,12 +2978,12 @@ contract CandyLand is ERC20, UnicornAccessControl /*, CanReceiveApproval */{
     event TokensTransferred(address wallet, uint value);
 
     function CandyLand(address _candyTrees, address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        candyTokenAddress = unicornManagement.candyToken();
         candyTrees = CandyTreesInterface(_candyTrees);
     }
 
 
     function init() onlyManagement whenPaused external {
+        candyTokenAddress = unicornManagement.candyToken();
         userRank = UserRankInterface(unicornManagement.userRankAddress());
         megaCandy = TrustedTokenInterface(unicornManagement.megaCandy());
         unicornBalances = UnicornBalancesInterface(unicornManagement.unicornBalancesAddress());
@@ -3152,11 +3155,11 @@ contract CandyLandSale is UnicornAccessControl /* , CanReceiveApproval*/ {
 
     function CandyLandSale(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
         //allowedFuncs[bytes4(keccak256("_receiveBuyLandForCandy(address,uint256)"))] = true;
-        candyTokenAddress = unicornManagement.candyToken();
     }
 
 
     function init() onlyManagement whenPaused external {
+        candyTokenAddress = unicornManagement.candyToken();
         userRank = UserRankInterface(unicornManagement.userRankAddress());
         candyLand = CandyLandInterface(unicornManagement.candyLandAddress());
         balances = UnicornBalancesInterface(unicornManagement.unicornBalancesAddress());
