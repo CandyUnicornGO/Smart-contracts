@@ -57,6 +57,7 @@ contract UnicornManagement {
     address public unicornMarketAddress;
 
     address public unicornBalancesAddress;
+    address public unicornFreezingAddress;
     address public unicornBreedingDBAddress;
     address public unicornPricesAddress;
 
@@ -211,7 +212,14 @@ contract UnicornManagement {
     function setUnicornBalances(address _unicornBalancesAddress) external onlyOwner whenPaused whenUnlocked {
         require(_unicornBalancesAddress != address(0));
         unicornBalancesAddress = _unicornBalancesAddress;
-        //setUnicornContract(_unicornMarketAddress);
+        setUnicornContract(_unicornBalancesAddress);
+        //emit NewMarketAddress(_unicornBalancesAddress);
+    }
+
+    function setUnicornFreezing(address _unicornFreezingAddress) external onlyOwner whenPaused whenUnlocked {
+        require(_unicornFreezingAddress != address(0));
+        unicornFreezingAddress = _unicornFreezingAddress;
+        setUnicornContract(_unicornFreezingAddress);
         //emit NewMarketAddress(_unicornBalancesAddress);
     }
 
@@ -332,6 +340,7 @@ contract UnicornManagementInterface {
     //    function walletAddress() external view returns (address);
     function blackBoxAddress() external view returns (address);
     function unicornBreedingAddress() external view returns (address);
+    function unicornFreezingAddress() external view returns (address);
     function unicornGen0Address() external view returns (address);
     function unicornMarketAddress() external view returns (address);
 
@@ -401,7 +410,8 @@ contract UnicornAccessControl {
     }
 
     modifier onlyBreeding() {
-        require(msg.sender == unicornManagement.unicornBreedingAddress());
+        require(msg.sender == unicornManagement.unicornBreedingAddress() ||
+                msg.sender == unicornManagement.unicornFreezingAddress());
         _;
     }
 
@@ -411,7 +421,7 @@ contract UnicornAccessControl {
     }
 
     modifier onlyBreedingOrGen0() {
-        require(msg.sender == unicornManagement.unicornGen0Address() || msg.sender == unicornManagement.unicornGen0Address());
+        require(msg.sender == unicornManagement.unicornBreedingAddress() || msg.sender == unicornManagement.unicornGen0Address());
         _;
     }
 
@@ -2013,14 +2023,14 @@ contract UnicornGen0 is UnicornAccessControl {
         balances = UnicornBalancesInterface(unicornManagement.unicornBalancesAddress());
     }
 
-    function createUnicornForCandy() public payable whenNotPaused returns(uint256)   {
+    function createUnicornForCandy() public whenNotPaused returns(uint256)   {
         uint price = getCreateUnicornPrice();
         require(balances.transfer(candyTokenAddress, msg.sender, balances, price));
         //require(candyToken.serviceTransfer(msg.sender, unicornManagement.walletAddress(), price));
         return _createUnicorn(msg.sender);
     }
 
-    function createPresaleUnicorns(uint _count, address _owner) public payable onlyManager whenPaused returns(bool) {
+    function createPresaleUnicorns(uint _count, address _owner) public onlyManager whenPaused returns(bool) {
         require(breedingDB.gen0PresaleCount().add(_count) <= breedingDB.gen0PresaleLimit());
         uint256 newUnicornId;
         address owner = _owner == address(0) ? msg.sender : _owner;
@@ -2037,7 +2047,7 @@ contract UnicornGen0 is UnicornAccessControl {
     function _createUnicorn(address _owner) private returns(uint256) {
         require(breedingDB.gen0Count() < breedingDB.gen0Limit());
         uint256 newUnicornId = unicornToken.createUnicorn(_owner);
-        blackBox.createGen0.value(0)(newUnicornId);
+        blackBox.createGen0(newUnicornId);
         emit CreateUnicorn(_owner, newUnicornId, 0, 0);
         breedingDB.incGen0Count();
         return newUnicornId;
@@ -2086,8 +2096,8 @@ contract UnicornBreeding is UnicornAccessControl {
         revert();
     }
 
-    function UnicornBreeding(address _unicornFreezing, address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
-        unicornFreezing = UnicornFreezingInterface(_unicornFreezing);
+    function UnicornBreeding(address _unicornManagementAddress) UnicornAccessControl(_unicornManagementAddress) public {
+
     }
 
     function init() onlyManagement whenPaused external {
@@ -2097,6 +2107,7 @@ contract UnicornBreeding is UnicornAccessControl {
         breedingDB = BreedingDataBaseInterface(unicornManagement.unicornBreedingDBAddress());
         unicornPrices = UnicornPricesInterface(unicornManagement.unicornPricesAddress());
         balances = UnicornBalancesInterface(unicornManagement.unicornBalancesAddress());
+        unicornFreezing = UnicornFreezingInterface(unicornManagement.unicornFreezingAddress());
     }
 
 
@@ -2115,7 +2126,7 @@ contract UnicornBreeding is UnicornAccessControl {
         }
     }
 
-    function acceptHybridization(uint _firstUnicornId, uint _secondUnicornId) whenNotPaused public payable {
+    function acceptHybridization(uint _firstUnicornId, uint _secondUnicornId) whenNotPaused public {
         require(unicornToken.owns(msg.sender, _secondUnicornId));
         require(_secondUnicornId != _firstUnicornId);
         require(unicornFreezing.isUnfreezed(_firstUnicornId) && unicornFreezing.isUnfreezed(_secondUnicornId));
@@ -2142,7 +2153,7 @@ contract UnicornBreeding is UnicornAccessControl {
         _deleteHybridization(_firstUnicornId);
     }
 
-    function selfHybridization(uint _firstUnicornId, uint _secondUnicornId) whenNotPaused public payable {
+    function selfHybridization(uint _firstUnicornId, uint _secondUnicornId) whenNotPaused public {
         require(unicornToken.owns(msg.sender, _firstUnicornId) && unicornToken.owns(msg.sender, _secondUnicornId));
         require(_secondUnicornId != _firstUnicornId);
         require(unicornFreezing.isUnfreezed(_firstUnicornId) && unicornFreezing.isUnfreezed(_secondUnicornId));
@@ -2158,7 +2169,7 @@ contract UnicornBreeding is UnicornAccessControl {
         unicornFreezing.plusFreezingTime(_firstUnicornId);
         unicornFreezing.plusFreezingTime(_secondUnicornId);
         uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
-        blackBox.geneCore.value(0)(newUnicornId, _firstUnicornId, _secondUnicornId);
+        blackBox.geneCore(newUnicornId, _firstUnicornId, _secondUnicornId);
         emit SelfHybridization(_firstUnicornId, _secondUnicornId, newUnicornId, selfHybridizationPrice);
         emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
     }
