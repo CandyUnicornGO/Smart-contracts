@@ -1607,22 +1607,22 @@ contract UnicornBalances is UnicornAccessControl {
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
-    function transferTokensToDividendManager(address token) onlyManager public {
-        require(token != address(0));
-        //require(!trustedTokens[token]);
-        require(tokens[token][this] > 0);
-        require(ERC20(token).transfer(unicornManagement.dividendManagerAddress(), tokens[token][this]));
-        tokens[token][this] = 0;
-        //emit Withdraw(token, msg.sender, amount, tokens[token][msg.sender]);
-    }
-
-    function transferETZToDividendManager(uint _value) onlyManager public {
-        require(tokens[0][this] >= _value);
-        DividendManagerInterface dividendManager = DividendManagerInterface(unicornManagement.dividendManagerAddress());
-        dividendManager.payDividend.value(_value)();
-        tokens[0][msg.sender] = tokens[0][msg.sender].sub(_value);
-        emit FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
-    }
+//    function transferTokensToDividendManager(address token) onlyManager public {
+//        require(token != address(0));
+//        //require(!trustedTokens[token]);
+//        require(tokens[token][this] > 0);
+//        require(ERC20(token).transfer(unicornManagement.dividendManagerAddress(), tokens[token][this]));
+//        tokens[token][this] = 0;
+//        //emit Withdraw(token, msg.sender, amount, tokens[token][msg.sender]);
+//    }
+//
+//    function transferETZToDividendManager(uint _value) onlyManager public {
+//        require(tokens[0][this] >= _value);
+//        DividendManagerInterface dividendManager = DividendManagerInterface(unicornManagement.dividendManagerAddress());
+//        dividendManager.payDividend.value(_value)();
+//        tokens[0][msg.sender] = tokens[0][msg.sender].sub(_value);
+//        emit FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
+//    }
 
     function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public {
         _extraData;
@@ -2025,7 +2025,7 @@ contract UnicornGen0 is UnicornAccessControl {
 
     function createUnicornForCandy() public whenNotPaused returns(uint256)   {
         uint price = getCreateUnicornPrice();
-        require(balances.transfer(candyTokenAddress, msg.sender, balances, price));
+        require(balances.transfer(candyTokenAddress, msg.sender, unicornManagement.dividendManagerAddress(), price));
         //require(candyToken.serviceTransfer(msg.sender, unicornManagement.walletAddress(), price));
         return _createUnicorn(msg.sender);
     }
@@ -2080,17 +2080,15 @@ contract UnicornBreeding is UnicornAccessControl {
     //TrustedTokenInterface public candyToken;
     address public candyTokenAddress;
 
-    event HybridizationAdd(uint indexed unicornId, uint price);
-    event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price);
-    event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price);
-    event HybridizationDelete(uint indexed unicornId);
+    event HybridizationAdd(uint indexed unicornId, uint price, address owner);
+    event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId,
+                                uint price, address firstOwner, address secondOwner);
+    event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price, address owner);
+    event HybridizationDelete(uint indexed unicornId, address owner);
     event CreateUnicorn(address indexed owner, uint indexed unicornId, uint parent1, uint  parent2);
-
-
     event FreeHybridization(uint256 indexed unicornId);
 
-
-    event FundsTransferred(address dividendManager, uint value);
+//    event FundsTransferred(address dividendManager, uint value);
 
     function() public payable {
         revert();
@@ -2135,11 +2133,11 @@ contract UnicornBreeding is UnicornAccessControl {
         require(unicornToken.getUnicornGenByte(_firstUnicornId, 10) > 0 && unicornToken.getUnicornGenByte(_secondUnicornId, 10) > 0);
 
         uint price = breedingDB.hybridizationPrice(_firstUnicornId);
+        address firstUnicornOwner = unicornToken.ownerOf(_firstUnicornId);
 
         if (price > 0) {
             uint fullPrice = unicornPrices.getHybridizationFullPrice(price);
-
-            require(balances.transferWithFee(candyTokenAddress, msg.sender, fullPrice, balances, unicornToken.ownerOf(_firstUnicornId), price));
+            require(balances.transferWithFee(candyTokenAddress, msg.sender, fullPrice, unicornManagement.dividendManagerAddress(), firstUnicornOwner, price));
 
         }
 
@@ -2148,7 +2146,7 @@ contract UnicornBreeding is UnicornAccessControl {
         uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
         blackBox.geneCore(newUnicornId, _firstUnicornId, _secondUnicornId);
 
-        emit HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId, price);
+        emit HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId, price, firstUnicornOwner, msg.sender);
         emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
         _deleteHybridization(_firstUnicornId);
     }
@@ -2163,7 +2161,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
         if (selfHybridizationPrice > 0) {
             //            require(balances.balanceOf(candyTokenAddress,msg.sender) >= selfHybridizationPrice);
-            require(balances.transfer(candyTokenAddress, msg.sender, balances, selfHybridizationPrice));
+            require(balances.transfer(candyTokenAddress, msg.sender, unicornManagement.dividendManagerAddress(), selfHybridizationPrice));
         }
 
         unicornFreezing.plusFreezingTime(_firstUnicornId);
@@ -2207,9 +2205,9 @@ contract UnicornMarket is UnicornAccessControl {
     UnicornBalancesInterface public balances;
     UnicornPricesInterface public prices;
 
-    event OfferAdd(uint256 indexed unicornId, uint priceCandy);
-    event OfferDelete(uint256 indexed unicornId);
-    event UnicornSold(uint256 indexed unicornId, uint priceCandy);
+    event OfferAdd(uint256 indexed unicornId, uint priceCandy, address owner);
+    event OfferDelete(uint256 indexed unicornId, address owner);
+    event UnicornSold(uint256 indexed unicornId, uint priceCandy, address oldOwner, address newOwner);
     event FreeOffer(uint256 indexed unicornId);
 
 
@@ -2250,7 +2248,7 @@ contract UnicornMarket is UnicornAccessControl {
 
         if (price > 0) {
             uint fullPrice = getOfferPrice(_unicornId);
-            require(balances.transferWithFee(candyTokenAddress, msg.sender, fullPrice, balances, owner, price));
+            require(balances.transferWithFee(candyTokenAddress, msg.sender, fullPrice, unicornManagement.dividendManagerAddress(), owner, price));
         }
 
         emit UnicornSold(_unicornId, price);
@@ -2389,7 +2387,7 @@ contract UnicornCoinMarket is UnicornAccessControl {
         //            require(t.serviceTransfer(msg.sender, user, amount));
         //            require(t.serviceTransfer(msg.sender, unicornManagement.walletAddress(), _fee));
         //        } else {
-        require(balances.transferWithFee(tokenGet, msg.sender, amount, balances, user, amount.sub(_fee)));
+        require(balances.transferWithFee(tokenGet, msg.sender, amount, unicornManagement.dividendManagerAddress(), user, amount.sub(_fee)));
         //            balances.tokenMinus(tokenGet, msg.sender, amount);
         //            balances.tokenPlus(tokenGet, user, amount.sub(_fee));
         //            balances.tokenPlus(tokenGet, this, _fee);
@@ -2676,7 +2674,7 @@ contract UserRank is UnicornAccessControl /*, CanReceiveApproval*/ {
         uint _index = userRanks[_user] + 1;
         require(_index <= ranksCount);
 
-        require(balances.transfer(candyTokenAddress, _user, balances, ranks[_index].price));
+        require(balances.transfer(candyTokenAddress, _user, unicornManagement.dividendManagerAddress(), ranks[_index].price));
         userRanks[_user] = _index;
         emit BuyNextRank(_user, _index);
     }
@@ -2688,7 +2686,7 @@ contract UserRank is UnicornAccessControl /*, CanReceiveApproval*/ {
 
         uint fullPrice = _getPrice(userRanks[_user], _index);
 
-        require(balances.transfer(candyTokenAddress, _user, balances, fullPrice));
+        require(balances.transfer(candyTokenAddress, _user, unicornManagement.dividendManagerAddress(), fullPrice));
         userRanks[_user] = _index;
         emit BuyRank(_user, _index);
     }
@@ -3099,7 +3097,7 @@ contract CandyLand is ERC20, UnicornAccessControl /*, CanReceiveApproval */{
 
         if (_gardenerId > 0) {
             //require(candyTrees.gardenerExists(_gardenerId));
-            require(unicornBalances.transfer(candyTokenAddress, msg.sender, unicornBalances, candyTrees.gardenerPrice(_gardenerId).mul(_count)));
+            require(unicornBalances.transfer(candyTokenAddress, msg.sender, unicornManagement.dividendManagerAddress(), candyTrees.gardenerPrice(_gardenerId).mul(_count)));
         }
 
         uint gardenId = candyTrees.makePlant(msg.sender, _count, _gardenerId);
@@ -3251,7 +3249,7 @@ contract CandyLandSale is UnicornAccessControl /* , CanReceiveApproval*/ {
         uint totalPrice;
 
         (rank, neededRank, totalPrice) = getBuyLandInfo(_owner, _count);
-        require(balances.transfer(candyTokenAddress, _owner, balances, totalPrice));
+        require(balances.transfer(candyTokenAddress, _owner, unicornManagement.dividendManagerAddress(), totalPrice));
         if (rank < neededRank) {
             userRank.getRank(_owner, neededRank);
         }
