@@ -2081,8 +2081,7 @@ contract UnicornBreeding is UnicornAccessControl {
     address public candyTokenAddress;
 
     event HybridizationAdd(uint indexed unicornId, uint price);
-    event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId,
-        uint price, address firstOwner, address secondOwner);
+    event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price);
     event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price, address owner);
     event HybridizationDelete(uint indexed unicornId);
     event CreateUnicorn(address indexed owner, uint indexed unicornId, uint parent1, uint  parent2);
