@@ -411,7 +411,7 @@ contract UnicornAccessControl {
 
     modifier onlyBreeding() {
         require(msg.sender == unicornManagement.unicornBreedingAddress() ||
-                msg.sender == unicornManagement.unicornFreezingAddress());
+        msg.sender == unicornManagement.unicornFreezingAddress());
         _;
     }
 
@@ -1607,22 +1607,22 @@ contract UnicornBalances is UnicornAccessControl {
 
     //////////////////////////////////////////////////////////////////////////////////////////
 
-//    function transferTokensToDividendManager(address token) onlyManager public {
-//        require(token != address(0));
-//        //require(!trustedTokens[token]);
-//        require(tokens[token][this] > 0);
-//        require(ERC20(token).transfer(unicornManagement.dividendManagerAddress(), tokens[token][this]));
-//        tokens[token][this] = 0;
-//        //emit Withdraw(token, msg.sender, amount, tokens[token][msg.sender]);
-//    }
-//
-//    function transferETZToDividendManager(uint _value) onlyManager public {
-//        require(tokens[0][this] >= _value);
-//        DividendManagerInterface dividendManager = DividendManagerInterface(unicornManagement.dividendManagerAddress());
-//        dividendManager.payDividend.value(_value)();
-//        tokens[0][msg.sender] = tokens[0][msg.sender].sub(_value);
-//        emit FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
-//    }
+    //    function transferTokensToDividendManager(address token) onlyManager public {
+    //        require(token != address(0));
+    //        //require(!trustedTokens[token]);
+    //        require(tokens[token][this] > 0);
+    //        require(ERC20(token).transfer(unicornManagement.dividendManagerAddress(), tokens[token][this]));
+    //        tokens[token][this] = 0;
+    //        //emit Withdraw(token, msg.sender, amount, tokens[token][msg.sender]);
+    //    }
+    //
+    //    function transferETZToDividendManager(uint _value) onlyManager public {
+    //        require(tokens[0][this] >= _value);
+    //        DividendManagerInterface dividendManager = DividendManagerInterface(unicornManagement.dividendManagerAddress());
+    //        dividendManager.payDividend.value(_value)();
+    //        tokens[0][msg.sender] = tokens[0][msg.sender].sub(_value);
+    //        emit FundsTransferred(unicornManagement.dividendManagerAddress(), _value);
+    //    }
 
     function receiveApproval(address _from, uint256 _value, address _token, bytes _extraData) public {
         _extraData;
@@ -2023,7 +2023,7 @@ contract UnicornGen0 is UnicornAccessControl {
         balances = UnicornBalancesInterface(unicornManagement.unicornBalancesAddress());
     }
 
-    function createUnicornForCandy() public whenNotPaused returns(uint256)   {
+    function createUnicorn() public whenNotPaused returns(uint256)   {
         uint price = getCreateUnicornPrice();
         require(balances.transfer(candyTokenAddress, msg.sender, unicornManagement.dividendManagerAddress(), price));
         //require(candyToken.serviceTransfer(msg.sender, unicornManagement.walletAddress(), price));
@@ -2082,13 +2082,13 @@ contract UnicornBreeding is UnicornAccessControl {
 
     event HybridizationAdd(uint indexed unicornId, uint price);
     event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId,
-                                uint price, address firstOwner, address secondOwner);
-    event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price);
+        uint price, address firstOwner, address secondOwner);
+    event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price, address owner);
     event HybridizationDelete(uint indexed unicornId);
     event CreateUnicorn(address indexed owner, uint indexed unicornId, uint parent1, uint  parent2);
     event FreeHybridization(uint256 indexed unicornId);
 
-//    event FundsTransferred(address dividendManager, uint value);
+    //    event FundsTransferred(address dividendManager, uint value);
 
     function() public payable {
         revert();
@@ -2776,7 +2776,7 @@ interface UserRankInterface  {
     function buyRank(uint _index) external;
     function getIndividualPrice(address _user, uint _index) external view returns (uint);
     function getRankPriceEth(uint _index) external view returns (uint);
-    function getRankPriceCandy(uint _index) external view returns (uint);
+    function getRankPrice(uint _index) external view returns (uint);
     function getRankLandLimit(uint _index) external view returns (uint);
     function getRankTitle(uint _index) external view returns (string);
     function getUserRank(address _user) external view returns (uint);
@@ -3181,8 +3181,8 @@ contract CandyLandSale is UnicornAccessControl /* , CanReceiveApproval*/ {
     }
 
 
-    function buyLandForCandy(uint _count) external {
-        _buyLandForCandy(msg.sender, _count);
+    function buyLand(uint _count) external {
+        _buyLand(msg.sender, _count);
     }
 
     //    function _receiveBuyLandForCandy(address _owner, uint _count) onlySelf onlyPayloadSize(2) public {
@@ -3233,7 +3233,7 @@ contract CandyLandSale is UnicornAccessControl /* , CanReceiveApproval*/ {
         if (rank < neededRank) {
             totalPrice = userRank.getIndividualPrice(_owner, neededRank);
             if (rank == 0 && prices.firstRankForFree()) {
-                totalPrice = totalPrice.sub(userRank.getRankPriceCandy(1));
+                totalPrice = totalPrice.sub(userRank.getRankPrice(1));
             }
         }
         totalPrice = totalPrice.add(_count.mul(landPriceCandy));
@@ -3241,7 +3241,7 @@ contract CandyLandSale is UnicornAccessControl /* , CanReceiveApproval*/ {
         return (rank, neededRank, totalPrice);
     }
 
-    function _buyLandForCandy(address _owner, uint _count) internal  {
+    function _buyLand(address _owner, uint _count) internal  {
         require(_count > 0);
         require(candyLand.totalSupply().add(_count) <= candyLand.MAX_SUPPLY());
         uint rank;
