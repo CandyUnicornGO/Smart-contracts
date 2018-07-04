@@ -2082,7 +2082,7 @@ contract UnicornBreeding is UnicornAccessControl {
 
     event HybridizationAdd(uint indexed unicornId, uint price);
     event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price);
-    event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price, address owner);
+    event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price);
     event HybridizationDelete(uint indexed unicornId);
     event CreateUnicorn(address indexed owner, uint indexed unicornId, uint parent1, uint  parent2);
     event FreeHybridization(uint256 indexed unicornId);
