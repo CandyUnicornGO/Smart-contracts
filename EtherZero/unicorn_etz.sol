@@ -2080,11 +2080,11 @@ contract UnicornBreeding is UnicornAccessControl {
     //TrustedTokenInterface public candyToken;
     address public candyTokenAddress;
 
-    event HybridizationAdd(uint indexed unicornId, uint price, address owner);
+    event HybridizationAdd(uint indexed unicornId, uint price);
     event HybridizationAccept(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId,
                                 uint price, address firstOwner, address secondOwner);
-    event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price, address owner);
-    event HybridizationDelete(uint indexed unicornId, address owner);
+    event SelfHybridization(uint indexed firstUnicornId, uint indexed secondUnicornId, uint newUnicornId, uint price);
+    event HybridizationDelete(uint indexed unicornId);
     event CreateUnicorn(address indexed owner, uint indexed unicornId, uint parent1, uint  parent2);
     event FreeHybridization(uint256 indexed unicornId);
 
@@ -2146,7 +2146,7 @@ contract UnicornBreeding is UnicornAccessControl {
         uint256 newUnicornId = unicornToken.createUnicorn(msg.sender);
         blackBox.geneCore(newUnicornId, _firstUnicornId, _secondUnicornId);
 
-        emit HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId, price, firstUnicornOwner, msg.sender);
+        emit HybridizationAccept(_firstUnicornId, _secondUnicornId, newUnicornId, price);
         emit CreateUnicorn(msg.sender, newUnicornId, _firstUnicornId, _secondUnicornId);
         _deleteHybridization(_firstUnicornId);
     }
@@ -2205,9 +2205,9 @@ contract UnicornMarket is UnicornAccessControl {
     UnicornBalancesInterface public balances;
     UnicornPricesInterface public prices;
 
-    event OfferAdd(uint256 indexed unicornId, uint priceCandy, address owner);
-    event OfferDelete(uint256 indexed unicornId, address owner);
-    event UnicornSold(uint256 indexed unicornId, uint priceCandy, address oldOwner, address newOwner);
+    event OfferAdd(uint256 indexed unicornId, uint priceCandy);
+    event OfferDelete(uint256 indexed unicornId);
+    event UnicornSold(uint256 indexed unicornId, uint priceCandy);
     event FreeOffer(uint256 indexed unicornId);
 
 
