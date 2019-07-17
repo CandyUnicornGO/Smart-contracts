@@ -251,8 +251,8 @@ contract UnicornTournament is UnicornAccessControl{
     uint8 constant maxTournamentPlayers = 5;
     uint8 constant numberOfMatches = 3;
     
-    uint16 constant MAIN_CHARACTERISTIC_RATIO = 15;
-    uint16 constant SECONDARY_CHARACTERISTIC_RATIO = 10;
+    uint16 MAIN_CHARACTERISTIC_RATIO = 15;
+    uint16 SECONDARY_CHARACTERISTIC_RATIO = 10;
 
     struct Tournament{
         uint[maxTournamentPlayers] unicorns;
@@ -270,18 +270,6 @@ contract UnicornTournament is UnicornAccessControl{
     UnicornTokenInterface unicornToken;
     TrustedTokenInterface megaCandyToken;
     UnicornBalancesInterface balances;
-
-    event rndEvent(uint rnd);
-    event timeEvent(uint time);
-    event kek(bytes32 _bytes);
-    event kek8(byte _byte);
-
-    function test() public returns (uint8)  {
-        uint8 rnd = uint8(uint256(keccak256(block.timestamp, block.difficulty))%10);
-        emit kek(keccak256(block.timestamp, block.difficulty));
-        emit kek8(byte(keccak256(block.timestamp, block.difficulty)<<8));
-        return rnd;
-    }
 
     event queueLengthEvent(uint8 length);
     //Add unicorn to tournament
@@ -308,9 +296,9 @@ contract UnicornTournament is UnicornAccessControl{
     
     uint8 constant STRENGTH_GEN_BYTE = 112;
     uint8 constant AGILITY_GEN_BYTE = 117;
-    uint8 constant SPEED_GEN_BYTE = 112;
-    uint8 constant INTELLECT_GEN_BYTE = 112;
-    uint8 constant CHARISMA_GEN_BYTE = 112;
+    uint8 constant SPEED_GEN_BYTE = 122;
+    uint8 constant INTELLECT_GEN_BYTE = 127;
+    uint8 constant CHARISMA_GEN_BYTE = 132;
     
     //Main and secondary characteristic in 3 matches
     uint8[2][3] mapMatchTypeToGenNumber = [
@@ -318,19 +306,12 @@ contract UnicornTournament is UnicornAccessControl{
         [STRENGTH_GEN_BYTE, AGILITY_GEN_BYTE],//fight
         [CHARISMA_GEN_BYTE, INTELLECT_GEN_BYTE] //pair
     ];
-
-    event rand4bit(uint8 max, uint8 points);
-    event unicornPoint(uint8 unicornIndex, uint32 unicornId, uint8 max, uint8 points);
-    event pointsEvent(uint16[maxTournamentPlayers]);
-    event matchesTypesEvent(uint8[3]);
-    event rndEvent(uint time, uint difficulty, bytes32 hash);
     
     function runTournament(uint _tournamentId) public{
         require(tournaments.length > _tournamentId);//Tournament created
         //require(!tournaments[_tournamentId].finished);//Tournament not finished
         
         bytes32 rnd = bytes32(keccak256(block.timestamp, block.difficulty));//random hash
-        emit rndEvent(block.timestamp, block.difficulty, rnd);
         tournaments[_tournamentId].blockNum = block.number;
         uint16[maxTournamentPlayers] memory points; //Unicorn's points
         
@@ -342,8 +323,6 @@ contract UnicornTournament is UnicornAccessControl{
             matchesRnd/3%3,
             matchesRnd/9%3
         ];
-        
-        emit matchesTypesEvent(matchedTypes);
         
         ///Copmute points
         
@@ -361,13 +340,11 @@ contract UnicornTournament is UnicornAccessControl{
                 for (uint8 stepNumber=0; stepNumber<2; stepNumber++){//2 times
                     points[unicorn] += uint16(rndInt % mainCharacteristic) * MAIN_CHARACTERISTIC_RATIO;
                     rndInt = rndInt/mainCharacteristic;
-                    points[unicorn] += uint16(rndInt % secondaryCharacteristic) * MAIN_CHARACTERISTIC_RATIO;
+                    points[unicorn] += uint16(rndInt % secondaryCharacteristic) * SECONDARY_CHARACTERISTIC_RATIO;
                     rndInt = rndInt/secondaryCharacteristic;
                 }
             }
         }
-        
-        emit pointsEvent(points);
         
         uint8 winner = 0;
         for (uint8 i = 0; i< maxTournamentPlayers; i++){
@@ -378,6 +355,7 @@ contract UnicornTournament is UnicornAccessControl{
         
         tournaments[_tournamentId].winner = tournaments[_tournamentId].unicorns[winner];
         tournaments[_tournamentId].finished = true;
+        
     }
 
     function getTournamentsLength() public view returns(uint){
