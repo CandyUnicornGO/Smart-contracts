@@ -251,8 +251,8 @@ contract UnicornTournament is UnicornAccessControl{
     uint8 constant maxTournamentPlayers = 5;
     uint8 constant numberOfMatches = 3;
     
-    uint16 MAIN_CHARACTERISTIC_RATIO = 15;
-    uint16 SECONDARY_CHARACTERISTIC_RATIO = 10;
+    uint16 constant MAIN_CHARACTERISTIC_RATIO = 15;
+    uint16 constant SECONDARY_CHARACTERISTIC_RATIO = 10;
 
     struct Tournament{
         uint[maxTournamentPlayers] unicorns;
@@ -260,23 +260,16 @@ contract UnicornTournament is UnicornAccessControl{
         bool finished;
         uint winner;
     }
+    
+    Tournament[] public tournaments;
 
     uint[maxTournamentPlayers] queue;
     uint8 public queueLength = 0;
+    mapping(uint256 => uint32) public unicornUnfreezeBlock;
 
-    Tournament[] public tournaments;
-    //unicornId => tournamentId
-    mapping (uint => uint) public unicornTournament;
-    // Tournament index => tournamentId
-    mapping(uint => uint) public tournamentsIndexes;
-    uint public tournamentsSize = 0;
-
-    uint tournamentId = 0;
     UnicornTokenInterface unicornToken;
     TrustedTokenInterface megaCandyToken;
     UnicornBalancesInterface balances;
-
-    event FundsTransferred(address dividendManager, uint value);
 
     event rndEvent(uint rnd);
     event timeEvent(uint time);
@@ -293,12 +286,14 @@ contract UnicornTournament is UnicornAccessControl{
     event queueLengthEvent(uint8 length);
     //Add unicorn to tournament
     function participate(uint _unicornId) public returns (uint){
+        require(unicornUnfreezeBlock[_unicornId] < block.number);
         emit queueLengthEvent(queueLength);
         queue[queueLength++] = _unicornId;
+        unicornUnfreezeBlock[_unicornId] = 4294967295;//UINT32_MAX
         if (queueLength == maxTournamentPlayers){
             tournaments.length++;
             uint tournamentIndex = tournaments.length - 1;
-            tournaments[tournamentIndex].blockNum = block.number;
+            //tournaments[tournamentIndex].blockNum = block.number;
             tournaments[tournamentIndex].finished = false;
             for(uint8 i = 0; i<maxTournamentPlayers; i++){
                 tournaments[tournamentIndex].unicorns[i] = queue[i];
@@ -328,12 +323,15 @@ contract UnicornTournament is UnicornAccessControl{
     event unicornPoint(uint8 unicornIndex, uint32 unicornId, uint8 max, uint8 points);
     event pointsEvent(uint16[maxTournamentPlayers]);
     event matchesTypesEvent(uint8[3]);
+    event rndEvent(uint time, uint difficulty, bytes32 hash);
     
     function runTournament(uint _tournamentId) public{
         require(tournaments.length > _tournamentId);//Tournament created
         //require(!tournaments[_tournamentId].finished);//Tournament not finished
         
         bytes32 rnd = bytes32(keccak256(block.timestamp, block.difficulty));//random hash
+        emit rndEvent(block.timestamp, block.difficulty, rnd);
+        tournaments[_tournamentId].blockNum = block.number;
         uint16[maxTournamentPlayers] memory points; //Unicorn's points
         
         ///Matches type generation
@@ -347,22 +345,20 @@ contract UnicornTournament is UnicornAccessControl{
         
         emit matchesTypesEvent(matchedTypes);
         
-        uint256 rndInt = uint256(rnd);
         ///Copmute points
+        
+        uint256 rndInt = uint256(rnd);
+        
         for (uint8 matchNumber=0; matchNumber<numberOfMatches; matchNumber++){//Every match
             for (uint8 unicorn=0; unicorn<maxTournamentPlayers; unicorn++){//Every unicorn
+            
                 //Main characteristic in this match from unicorn
                 uint8 mainCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], mapMatchTypeToGenNumber[matchedTypes[matchNumber]][0]);
+                
                 //Secondary characteristic in this match from unicorn
                 uint8 secondaryCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], mapMatchTypeToGenNumber[matchedTypes[matchNumber]][1]);
+        
                 for (uint8 stepNumber=0; stepNumber<2; stepNumber++){//2 times
-                    /*
-                    uint8 unicornRnd = uint8(rnd << 4) >> 4;//get last 4 bits from hash
-                    rnd = rnd >> 4;// delete last 4 bits in hast
-                    uint256 
-                    emit kek(rnd);
-                    emit rand4bit(unicornRnd);
-                    */
                     points[unicorn] += uint16(rndInt % mainCharacteristic) * MAIN_CHARACTERISTIC_RATIO;
                     rndInt = rndInt/mainCharacteristic;
                     points[unicorn] += uint16(rndInt % secondaryCharacteristic) * MAIN_CHARACTERISTIC_RATIO;
@@ -370,6 +366,7 @@ contract UnicornTournament is UnicornAccessControl{
                 }
             }
         }
+        
         emit pointsEvent(points);
         
         uint8 winner = 0;
@@ -390,38 +387,6 @@ contract UnicornTournament is UnicornAccessControl{
     function getQueue() public view returns (uint[maxTournamentPlayers]){
         return queue;
     }
-
-    /*
-    function createTournament(uint _unicornId) public {
-        require(unicornToken.owns(msg.sender, _unicornId));
-        require(unicornTournament[_unicornId] == 0);
-
-
-        tournaments[++tournamentId].unicorns.push(_unicornId);
-        tournaments[tournamentId].index = tournamentsSize;
-
-        tournamentsIndexes[tournamentsSize++] = tournamentId;
-
-    }
-
-    function joinTournament(uint _tournamentId, uint _unicornId) {
-        require(unicornToken.owns(msg.sender, _unicornId));
-        require(unicornTournament[_unicornId] == 0);
-        require(!tournaments[_tournamentId].finished);
-        //after create unicorns.length == 1 its means tournament exists
-        require(tournaments[_tournamentId].unicorns.length > 0 &&
-                tournaments[_tournamentId].unicorns.length < maxTournamentPlayers);
-
-
-        tournaments[++tournamentId].unicorns.push(_unicornId);
-
-        if (tournaments[_tournamentId].unicorns.length == maxTournamentPlayers) {
-            tournaments[_tournamentId].blockNum == block.number;
-        }
-
-    }
-    */
-
 
     function getTournamentUnicorns(uint _tournamentId)  public view returns (uint[maxTournamentPlayers]) {
         return tournaments[_tournamentId].unicorns;
@@ -449,6 +414,7 @@ contract UnicornTournament is UnicornAccessControl{
         ERC20(_token).transfer(unicornManagement.walletAddress(), ERC20(_token).balanceOf(this));
     }
 
+    event FundsTransferred(address dividendManager, uint value);
 
     function transferEthersToDividendManager(uint _value) onlyManager public {
         require(address(this).balance >= _value);
