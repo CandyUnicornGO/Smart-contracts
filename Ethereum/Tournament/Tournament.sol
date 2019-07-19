@@ -249,13 +249,21 @@ contract UnicornTournament is UnicornAccessControl{
     //ERC20 public candyToken;
 
     uint8 constant maxTournamentPlayers = 5;
-    uint8 constant numberOfMatches = 3;
+    uint8 numberOfMatches = 3;//3
+    uint8 numberOfDiceRolls = 2;//2
     
     uint16 MAIN_CHARACTERISTIC_RATIO = 15;
     uint16 SECONDARY_CHARACTERISTIC_RATIO = 10;
+    
+    struct Participant{
+        uint tournamentId;
+        uint unfreezeBlock;
+        bool busy;
+    }
 
     struct Tournament{
         uint[maxTournamentPlayers] unicorns;
+        bytes32 rnd;
         uint blockNum;
         bool finished;
         uint winner;
@@ -265,29 +273,31 @@ contract UnicornTournament is UnicornAccessControl{
 
     uint[maxTournamentPlayers] queue;
     uint8 public queueLength = 0;
-    mapping(uint256 => uint32) public unicornUnfreezeBlock;
+    mapping(uint => Participant) public participants;
 
     UnicornTokenInterface unicornToken;
     TrustedTokenInterface megaCandyToken;
     UnicornBalancesInterface balances;
 
-    event queueLengthEvent(uint8 length);
     //Add unicorn to tournament
     function participate(uint _unicornId) public returns (uint){
-        require(unicornUnfreezeBlock[_unicornId] < block.number);
-        emit queueLengthEvent(queueLength);
+        require(!participants[_unicornId].busy);
+        require(participants[_unicornId].unfreezeBlock < block.number);
+        
         queue[queueLength++] = _unicornId;
-        unicornUnfreezeBlock[_unicornId] = 4294967295;//UINT32_MAX
+        participants[_unicornId].busy = true;
+        
         if (queueLength == maxTournamentPlayers){
             tournaments.length++;
             uint tournamentIndex = tournaments.length - 1;
-            //tournaments[tournamentIndex].blockNum = block.number;
+            tournaments[tournamentIndex].blockNum = block.number;
             tournaments[tournamentIndex].finished = false;
+            tournaments[tournamentIndex].rnd = bytes32(keccak256(block.timestamp, block.difficulty));
             for(uint8 i = 0; i<maxTournamentPlayers; i++){
                 tournaments[tournamentIndex].unicorns[i] = queue[i];
+                participants[queue[i]].tournamentId = tournamentIndex;
             }
             queueLength = 0;
-            emit queueLengthEvent(queueLength);
             return tournaments.length-1;
         } else {
             return tournaments.length;
@@ -307,12 +317,13 @@ contract UnicornTournament is UnicornAccessControl{
         [CHARISMA_GEN_BYTE, INTELLECT_GEN_BYTE] //pair
     ];
     
-    function runTournament(uint _tournamentId) public{
+    event TournamentFinished(uint tournamentId, uint16[maxTournamentPlayers] points, uint winner);
+    
+    function runTournament(uint _tournamentId) public {
         require(tournaments.length > _tournamentId);//Tournament created
-        //require(!tournaments[_tournamentId].finished);//Tournament not finished
+        require(!tournaments[_tournamentId].finished);//Tournament not finished
         
-        bytes32 rnd = bytes32(keccak256(block.timestamp, block.difficulty));//random hash
-        tournaments[_tournamentId].blockNum = block.number;
+        bytes32 rnd = tournaments[_tournamentId].rnd;//random hash
         uint16[maxTournamentPlayers] memory points; //Unicorn's points
         
         ///Matches type generation
@@ -329,19 +340,19 @@ contract UnicornTournament is UnicornAccessControl{
         uint256 rndInt = uint256(rnd);
         
         for (uint8 matchNumber=0; matchNumber<numberOfMatches; matchNumber++){//Every match
-            for (uint8 unicorn=0; unicorn<maxTournamentPlayers; unicorn++){//Every unicorn
-            
+            for (uint8 diceRoll=0; diceRoll<numberOfDiceRolls; diceRoll++){//2 times
+                for (uint8 unicorn=0; unicorn<maxTournamentPlayers; unicorn++){//Every unicorn
+
                 //Main characteristic in this match from unicorn
                 uint8 mainCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], mapMatchTypeToGenNumber[matchedTypes[matchNumber]][0]);
                 
                 //Secondary characteristic in this match from unicorn
                 uint8 secondaryCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], mapMatchTypeToGenNumber[matchedTypes[matchNumber]][1]);
         
-                for (uint8 stepNumber=0; stepNumber<2; stepNumber++){//2 times
-                    points[unicorn] += uint16(rndInt % mainCharacteristic) * MAIN_CHARACTERISTIC_RATIO;
-                    rndInt = rndInt/mainCharacteristic;
-                    points[unicorn] += uint16(rndInt % secondaryCharacteristic) * SECONDARY_CHARACTERISTIC_RATIO;
-                    rndInt = rndInt/secondaryCharacteristic;
+                points[unicorn] += uint16(rndInt % mainCharacteristic) * MAIN_CHARACTERISTIC_RATIO;
+                rndInt = rndInt/mainCharacteristic;
+                points[unicorn] += uint16(rndInt % secondaryCharacteristic) * SECONDARY_CHARACTERISTIC_RATIO;
+                rndInt = rndInt/secondaryCharacteristic;
                 }
             }
         }
@@ -356,6 +367,17 @@ contract UnicornTournament is UnicornAccessControl{
         tournaments[_tournamentId].winner = tournaments[_tournamentId].unicorns[winner];
         tournaments[_tournamentId].finished = true;
         
+        emit TournamentFinished(_tournamentId, points, winner);
+    }
+    
+    function getPrize(uint _unicornId) public {
+        require(participants[_unicornId].busy);//Unicorn is participant
+        uint tournamentId = participants[_unicornId].tournamentId;
+        require(tournaments.length > tournamentId);//Tournament created (protection in case tournamentId == 0)
+        require(tournaments[tournamentId].finished);
+        
+        participants[_unicornId].busy = false;
+        participants[_unicornId].unfreezeBlock = tournaments[tournamentId].blockNum + 100;
     }
 
     function getTournamentsLength() public view returns(uint){
