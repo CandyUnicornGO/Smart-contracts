@@ -43,7 +43,8 @@ contract UnicornManagementInterface {
     function unicornTokenAddress() external view returns (address);
     function candyToken() external view returns (address);
     function candyPowerToken() external view returns (address);
-
+    function setUnicornContract(address _unicornContractAddress) public;
+    function transferOwnership(address _ownerAddress) external;
     function createDividendPercent() external view returns (uint);
     function sellDividendPercent() external view returns (uint);
     function subFreezingPrice() external view returns (uint);
@@ -282,6 +283,8 @@ contract UnicornTournament is UnicornAccessControl{
     function participate(uint _unicornId) public{
         require(!participants[_unicornId].busy);
         require(participants[_unicornId].unfreezeBlock < block.number);
+        require(unicornToken.ownerOf(_unicornId) == msg.sender);
+        require(balances.transfer(unicornManagement.candyToken(), msg.sender, this, 25000000000000000000));//Send 25 candy to tournament contract
         
         if (queueLength == 0){
             tournaments.length++;
@@ -371,6 +374,10 @@ contract UnicornTournament is UnicornAccessControl{
         require(tournaments[tournamentId].blockNum != 0);//Tournament created
         require(tournaments[tournamentId].finished);
         
+        if (tournaments[tournamentId].unicorns[tournaments[tournamentId].winner] == _unicornId){
+            require(balances.transfer(unicornManagement.candyToken(), this, unicornToken.ownerOf(_unicornId), 100000000000000000000));//Send 100 candy to unicornOwner
+        }
+        
         participants[_unicornId].busy = false;
         participants[_unicornId].unfreezeBlock = tournaments[tournamentId].blockNum + 100;
     }
@@ -406,7 +413,7 @@ contract UnicornTournament is UnicornAccessControl{
 
     function transferTokensToDividendManager(address _token) onlyManager public {
         require(ERC20(_token).balanceOf(this) > 0);
-        ERC20(_token).transfer(unicornManagement.walletAddress(), ERC20(_token).balanceOf(this));
+        ERC20(_token).transfer(unicornManagement.dividendManagerAddress(), ERC20(_token).balanceOf(this));
     }
 
     event FundsTransferred(address dividendManager, uint value);
