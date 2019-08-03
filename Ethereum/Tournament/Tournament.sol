@@ -373,9 +373,9 @@ contract UnicornTournament is UnicornAccessControl{
                 //Secondary characteristic in this match from unicorn
                 uint secondaryCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], mapMatchTypeToGenNumber[matchedTypes[matchNumber]][1]);
         
-                points[unicorn] += hashes[matchNumber] % mainCharacteristic * MAIN_CHARACTERISTIC_RATIO;
+                points[unicorn] += (hashes[matchNumber] % mainCharacteristic + 1) * MAIN_CHARACTERISTIC_RATIO;
                 hashes[matchNumber] = hashes[matchNumber]/mainCharacteristic;
-                points[unicorn] += hashes[matchNumber] % secondaryCharacteristic * SECONDARY_CHARACTERISTIC_RATIO;
+                points[unicorn] += (hashes[matchNumber] % secondaryCharacteristic + 1) * SECONDARY_CHARACTERISTIC_RATIO;
                 hashes[matchNumber] = hashes[matchNumber]/secondaryCharacteristic;
                 }
             }
