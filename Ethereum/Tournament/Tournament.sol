@@ -328,12 +328,33 @@ contract UnicornTournament is UnicornAccessControl{
     uint constant INTELLECT_GEN_BYTE = 127;
     uint constant CHARISMA_GEN_BYTE = 132;
     
-    //Main and secondary characteristic in 3 matches
-    uint[2][3] mapMatchTypeToGenNumber = [
-        [SPEED_GEN_BYTE, AGILITY_GEN_BYTE],//race
-        [STRENGTH_GEN_BYTE, AGILITY_GEN_BYTE],//fight
-        [CHARISMA_GEN_BYTE, INTELLECT_GEN_BYTE] //pair
-    ];
+    function deriveCritPrecentage(uint _unicornId) view public returns (uint) {
+        uint sumOfStats =
+            unicornToken.getUnicornGenByte(_unicornId, STRENGTH_GEN_BYTE) +
+            unicornToken.getUnicornGenByte(_unicornId, AGILITY_GEN_BYTE) +
+            unicornToken.getUnicornGenByte(_unicornId, SPEED_GEN_BYTE) +
+            unicornToken.getUnicornGenByte(_unicornId, INTELLECT_GEN_BYTE) +
+            unicornToken.getUnicornGenByte(_unicornId, CHARISMA_GEN_BYTE);
+        return 30 - sumOfStats;
+    }
+    
+    function deriveMatchesGenes(uint _rnd) pure private returns (uint[2][3]) {
+        uint[5] memory genesArr = [
+            STRENGTH_GEN_BYTE,
+            AGILITY_GEN_BYTE,
+            SPEED_GEN_BYTE,
+            INTELLECT_GEN_BYTE,
+            CHARISMA_GEN_BYTE
+        ];
+        uint[2][3] memory matchTypes;
+        for (uint i = 0; i<3; i++){
+            matchTypes[i][0] = genesArr[_rnd % 5];
+            _rnd = _rnd / 5;
+            matchTypes[i][1] = genesArr[_rnd % 4 < matchTypes[i][0] ? _rnd % 4 : _rnd % 4 + 1];
+            _rnd = _rnd / 4;
+        }
+        return matchTypes;
+    }
     
     event TournamentFinished(uint tournamentId, uint[maxTournamentPlayers] points, uint winner);
     
@@ -342,24 +363,20 @@ contract UnicornTournament is UnicornAccessControl{
         require(tournaments[_tournamentId].blockNum != 0);//Tournament started
         require(!tournaments[_tournamentId].finished);//Tournament not finished
         
-        uint rndInt = uint256(tournaments[_tournamentId].rnd);//random hash
-        
         uint[3] memory hashes = [
-            uint(keccak256(rndInt)),
-            uint(keccak256(rndInt+1)),
-            uint(keccak256(rndInt+2))
+            uint(keccak256(tournaments[_tournamentId].rnd)),
+            uint(keccak256(tournaments[_tournamentId].rnd+1)),
+            uint(keccak256(tournaments[_tournamentId].rnd+2))
         ];
         
         uint[maxTournamentPlayers] memory points;
+        uint[maxTournamentPlayers] memory critPrecentages;
+        for (uint i = 0; i<maxTournamentPlayers; i++){
+            critPrecentages[i] = deriveCritPrecentage(tournaments[_tournamentId].unicorns[i]);
+        }
         
         ///Matches type generation
-        uint matchesRnd = (rndInt << 248) >> 248;//get last 8 bits from hash
-        rndInt = rndInt >> 8;//delete last 8 bits in hash
-        uint[3] memory matchedTypes = [
-            matchesRnd%3,
-            matchesRnd/3%3,
-            matchesRnd/9%3
-        ];
+        uint[2][3] memory matchesGenes = deriveMatchesGenes(tournaments[_tournamentId].rnd);
         
         ///Copmute points
         
@@ -368,30 +385,31 @@ contract UnicornTournament is UnicornAccessControl{
                 for (uint unicorn=0; unicorn<maxTournamentPlayers; unicorn++){
 
                 //Main characteristic in this match from unicorn
-                uint mainCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], mapMatchTypeToGenNumber[matchedTypes[matchNumber]][0]);
+                uint mainCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], matchesGenes[matchNumber][0]);
                 
                 //Secondary characteristic in this match from unicorn
-                uint secondaryCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], mapMatchTypeToGenNumber[matchedTypes[matchNumber]][1]);
-        
+                uint secondaryCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], matchesGenes[matchNumber][1]);
+                
                 points[unicorn] += (hashes[matchNumber] % mainCharacteristic + 1) * MAIN_CHARACTERISTIC_RATIO;
                 hashes[matchNumber] = hashes[matchNumber]/mainCharacteristic;
                 points[unicorn] += (hashes[matchNumber] % secondaryCharacteristic + 1) * SECONDARY_CHARACTERISTIC_RATIO;
                 hashes[matchNumber] = hashes[matchNumber]/secondaryCharacteristic;
+                
+                points[unicorn] += (hashes[matchNumber] % 100 < critPrecentages[unicorn]) ? 100 : 0;
+                hashes[matchNumber] = hashes[matchNumber]/100;
                 }
             }
         }
         
-        uint winner = 0;
-        for (uint i = 0; i< maxTournamentPlayers; i++){
-            if (points[i] > points[winner]){
-                winner = i;
+        for (i = 0; i< maxTournamentPlayers; i++){
+            if (points[i] > points[tournaments[_tournamentId].winner]){
+                tournaments[_tournamentId].winner = i;
             }
         }
         
-        tournaments[_tournamentId].winner = winner;
         tournaments[_tournamentId].finished = true;
         
-        emit TournamentFinished(_tournamentId, points, winner);
+        emit TournamentFinished(_tournamentId, points, tournaments[_tournamentId].winner);
     }
     
     function getPrize(uint _unicornId) public {
