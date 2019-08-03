@@ -256,6 +256,10 @@ contract UnicornTournament is UnicornAccessControl{
     uint constant MAIN_CHARACTERISTIC_RATIO = 15;
     uint constant SECONDARY_CHARACTERISTIC_RATIO = 10;
     
+    uint constant PARTICIPATE_PRICE = 25000000000000000000;
+    
+    uint readyToPay = 0;
+    
     struct Participant{
         uint tournamentId;
         uint unfreezeBlock;
@@ -266,7 +270,8 @@ contract UnicornTournament is UnicornAccessControl{
         bool finished;
         uint blockNum;
         uint winner;
-        bytes32 rnd;
+        uint prizeMultipler;
+        uint rnd;
         uint[maxTournamentPlayers] unicorns;
     }
     
@@ -284,7 +289,9 @@ contract UnicornTournament is UnicornAccessControl{
         require(!participants[_unicornId].busy);
         require(participants[_unicornId].unfreezeBlock < block.number);
         require(unicornToken.ownerOf(_unicornId) == msg.sender);
-        require(balances.transfer(unicornManagement.candyToken(), msg.sender, this, 25000000000000000000));//Send 25 candy to tournament contract
+        require(balances.transfer(unicornManagement.candyToken(), msg.sender, this, PARTICIPATE_PRICE));//Send 25 candy to tournament contract
+        
+        readyToPay+=PARTICIPATE_PRICE;
         
         if (queueLength == 0){
             tournaments.length++;
@@ -297,7 +304,20 @@ contract UnicornTournament is UnicornAccessControl{
         
         if (queueLength == maxTournamentPlayers){
             tournaments[tournamentIndex].blockNum = block.number;
-            tournaments[tournamentIndex].rnd = bytes32(keccak256(block.timestamp, block.difficulty));
+            tournaments[tournamentIndex].rnd = uint(bytes32(keccak256(block.timestamp, block.difficulty)));
+            
+            uint prizeMaxMultipler = readyToPay / PARTICIPATE_PRICE;
+            uint[4] memory availableMultiplers = [uint(4), uint(6), uint(10), uint(25)];
+            for (uint i = 0; i<availableMultiplers.length; i++){
+                if (i+1 == availableMultiplers.length || prizeMaxMultipler < availableMultiplers[i+1]){
+                    uint prizeMultiplerIndex = tournaments[tournamentIndex].rnd % (i+1);//random prize multipler
+                    tournaments[tournamentIndex].rnd = tournaments[tournamentIndex].rnd / (i+1);
+                    tournaments[tournamentIndex].prizeMultipler = availableMultiplers[prizeMultiplerIndex];
+                    readyToPay -= PARTICIPATE_PRICE * availableMultiplers[prizeMultiplerIndex];
+                    break;
+                }
+            }
+            
             queueLength = 0;
         }
     }
@@ -381,7 +401,7 @@ contract UnicornTournament is UnicornAccessControl{
         require(tournaments[tournamentId].finished);
         
         if (tournaments[tournamentId].unicorns[tournaments[tournamentId].winner] == _unicornId){
-            require(balances.transfer(unicornManagement.candyToken(), this, unicornToken.ownerOf(_unicornId), 100000000000000000000));//Send 100 candy to unicornOwner
+            require(balances.transfer(unicornManagement.candyToken(), this, unicornToken.ownerOf(_unicornId), PARTICIPATE_PRICE * tournaments[tournamentId].prizeMultipler));//Send candy to unicorn owner
         }
         
         participants[_unicornId].busy = false;
