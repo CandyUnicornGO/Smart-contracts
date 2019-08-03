@@ -251,7 +251,7 @@ contract UnicornTournament is UnicornAccessControl{
 
     uint constant maxTournamentPlayers = 5;
     uint constant numberOfMatches = 3;//3
-    uint constant numberOfDiceRolls = 2;//2
+    uint constant numberOfDiceRolls = 3;//3
     
     uint constant MAIN_CHARACTERISTIC_RATIO = 15;
     uint constant SECONDARY_CHARACTERISTIC_RATIO = 10;
@@ -324,6 +324,12 @@ contract UnicornTournament is UnicornAccessControl{
         
         uint rndInt = uint256(tournaments[_tournamentId].rnd);//random hash
         
+        uint[3] memory hashes = [
+            uint(keccak256(rndInt)),
+            uint(keccak256(rndInt+1)),
+            uint(keccak256(rndInt+2))
+        ];
+        
         uint[maxTournamentPlayers] memory points;
         
         ///Matches type generation
@@ -347,10 +353,10 @@ contract UnicornTournament is UnicornAccessControl{
                 //Secondary characteristic in this match from unicorn
                 uint secondaryCharacteristic = unicornToken.getUnicornGenByte(tournaments[_tournamentId].unicorns[unicorn], mapMatchTypeToGenNumber[matchedTypes[matchNumber]][1]);
         
-                points[unicorn] += rndInt % mainCharacteristic * MAIN_CHARACTERISTIC_RATIO;
-                rndInt = rndInt/mainCharacteristic;
-                points[unicorn] += rndInt % secondaryCharacteristic * SECONDARY_CHARACTERISTIC_RATIO;
-                rndInt = rndInt/secondaryCharacteristic;
+                points[unicorn] += hashes[matchNumber] % mainCharacteristic * MAIN_CHARACTERISTIC_RATIO;
+                hashes[matchNumber] = hashes[matchNumber]/mainCharacteristic;
+                points[unicorn] += hashes[matchNumber] % secondaryCharacteristic * SECONDARY_CHARACTERISTIC_RATIO;
+                hashes[matchNumber] = hashes[matchNumber]/secondaryCharacteristic;
                 }
             }
         }
